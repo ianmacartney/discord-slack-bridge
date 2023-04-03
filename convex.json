@@ -1,0 +1,7 @@
+{
+  "project": "discord-slack-bridge",
+  "team": "convex",
+  "prodUrl": "https://addicted-jackal-92.convex.cloud",
+  "functions": "convex/",
+  "authInfo": []
+}
