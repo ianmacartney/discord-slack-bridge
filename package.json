@@ -1,0 +1,19 @@
+{
+  "name": "discord-slack-bridge",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "discord": "node discordBot.js"
+  },
+  "dependencies": {
+    "@types/node": "^18.11.18",
+    "convex": "^0.12.1",
+    "discord-interactions": "^3.3.0",
+    "node-fetch": "^3.3.0"
+  },
+  "devDependencies": {
+    "prettier": "^2.8.4"
+  }
+}
