@@ -30,7 +30,7 @@ export const backfillDiscordChannel = internalAction(
     });
     const { threads } = await channel.threads.fetchActive();
     for (const [, thread] of threads.entries()) {
-      if (thread.parentId !== discordId) {
+      if (thread.id !== discordId && thread.parentId !== discordId) {
         continue;
       }
       const threadId = await runMutation("discord:addUniqueDoc", {
