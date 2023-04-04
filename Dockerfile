@@ -12,6 +12,8 @@ USER node
 WORKDIR /usr/src/app
 ARG TOKEN
 ENV TOKEN=${TOKEN}
+ARG CONVEX_URL="https://demonic-gaur-439.convex.cloud"
+ENV CONVEX_URL=${CONVEX_URL}
 COPY --chown=node:node ./bot.js ./bot.js
 COPY --from=builder /usr/src/app/node_modules /usr/src/app/node_modules
 

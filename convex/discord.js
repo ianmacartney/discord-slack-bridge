@@ -1,3 +1,9 @@
+import {
+  serializeAuthor,
+  serializeChannel,
+  serializeMessage,
+  serializeThread,
+} from "./shared/discordUtils";
 import { internalMutation, mutation, query } from "./_generated/server";
 // import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 
@@ -12,7 +18,7 @@ const addUnique = async (db, table, doc, primaryKey = "id") => {
   return await db.insert(table, doc);
 };
 
-export const receiveDiscordMessage = mutation(
+export const receiveMessage = mutation(
   async ({ db, scheduler }, { author, message, channel, thread }) => {
     const authorId = await addUnique(db, "users", author);
     const channelId = await addUnique(db, "channels", channel);
@@ -20,7 +26,7 @@ export const receiveDiscordMessage = mutation(
     let dbThread, threadId;
     if (thread) {
       const threadId = await addUnique(db, "threads", { ...thread, channelId });
-      const dbThread = await db.get(threadId);
+      dbThread = await db.get(threadId);
     }
     const messageId = await addUnique(db, "messages", {
       ...message,
@@ -41,6 +47,57 @@ export const receiveDiscordMessage = mutation(
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         threadTs: dbThread?.slackThreadTs,
+        emojis: dbThread?.appliedTags.map(
+          (tagId) =>
+            dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
+        ),
+      });
+    }
+  }
+);
+
+export const updateMessage = mutation(
+  async ({ db, scheduler }, { previous, message }) => {
+    const existing = await db
+      .query("messages")
+      .filter((q) => q.eq(q.field("id"), previous.id))
+      .unique();
+    await db.patch(existing._id, message);
+    if (existing.slackTs) {
+      scheduler.runAfter(0, "actions/slack:updateMessage", {
+        slackMessageTs: existing.slackTs,
+      });
+    }
+  }
+);
+
+export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
+  const existing = await db
+    .query("messages")
+    .filter((q) => q.eq(q.field("id"), message.id))
+    .unique();
+  await db.patch(existing._id, { deleted: true });
+  if (existing.slackTs) {
+    scheduler.runAfter(0, "actions/slack:deleteMessage", {
+      slackMessageTs: existing.slackTs,
+    });
+  }
+});
+
+export const updateThread = mutation(
+  async ({ db, scheduler }, { previous, thread }) => {
+    const existing = await db
+      .query("threads")
+      .filter((q) => q.eq(q.field("id"), previous.id))
+      .unique();
+    await db.patch(existing._id, thread);
+    if (existing.slackTs) {
+      scheduler.runAfter(0, "actions/slack:updateThread", {
+        threadId: existing.threadId,
+        emojis: dbThread?.appliedTags.map(
+          (tagId) =>
+            dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
+        ),
       });
     }
   }
@@ -75,7 +132,7 @@ export const backfillDiscordChannel = internalMutation(
       });
       const messages = await thread.messages.fetch();
       for (const message of messages) {
-        const authorId = await addUnique(db, "users", serializeUser(message));
+        const authorId = await addUnique(db, "users", serializeAuthor(message));
         await addUnique(db, "messages", {
           ...serializeMessage(message),
           channelId,
