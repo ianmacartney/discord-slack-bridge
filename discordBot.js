@@ -5,7 +5,7 @@ import {
   serializeChannel,
   serializeMessage,
   serializeThread,
-} from "./convex/shared/discordUtils";
+} from "./shared/discordUtils";
 
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");

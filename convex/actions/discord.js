@@ -3,7 +3,7 @@ import {
   serializeChannel,
   serializeMessage,
   serializeThread,
-} from "../shared/discordUtils";
+} from "../../shared/discordUtils";
 import { internalAction } from "../_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 

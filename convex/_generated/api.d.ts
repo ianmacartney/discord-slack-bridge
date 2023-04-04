@@ -13,7 +13,6 @@ import type { ApiFromModules } from "convex/api";
 import type * as actions_discord from "../actions/discord";
 import type * as discord from "../discord";
 import type * as http from "../http";
-import type * as shared_discordUtils from "../shared/discordUtils";
 import type * as slack from "../slack";
 
 /**
@@ -29,6 +28,5 @@ export type API = ApiFromModules<{
   "actions/discord": typeof actions_discord;
   discord: typeof discord;
   http: typeof http;
-  "shared/discordUtils": typeof shared_discordUtils;
   slack: typeof slack;
 }>;
