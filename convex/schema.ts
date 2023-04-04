@@ -29,7 +29,7 @@ export default defineSchema({
     rawPosition: s.number(),
     topic: s.string(),
     type: s.number(),
-  }),
+  }).index("id", ["id"]),
   messages: defineTable({
     activity: s.null(),
     applicationId: s.null(),
@@ -65,7 +65,7 @@ export default defineSchema({
     tts: s.boolean(),
     type: s.number(),
     webhookId: s.null(),
-  }),
+  }).index("id", ["id"]),
   threads: defineTable({
     appliedTags: s.array(s.string()),
     archiveTimestamp: s.number(),
@@ -89,7 +89,7 @@ export default defineSchema({
     rateLimitPerUser: s.number(),
     totalMessageSent: s.number(),
     type: s.number(),
-  }),
+  }).index("id", ["id"]),
   users: defineTable({
     avatar: s.string(),
     avatarURL: s.string(),
@@ -111,5 +111,5 @@ export default defineSchema({
     tag: s.string(),
     userId: s.string(),
     username: s.string(),
-  }),
+  }).index("id", ["id"]),
 });
