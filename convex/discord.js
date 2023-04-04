@@ -33,7 +33,7 @@ export const receiveMessage = mutation(
     const dbChannel = await db.get(channelId);
     let dbThread, threadId;
     if (thread) {
-      const threadId = await addUnique(db, "threads", { ...thread, channelId });
+      threadId = await addUnique(db, "threads", { ...thread, channelId });
       dbThread = await db.get(threadId);
     }
     const messageId = await addUnique(db, "messages", {

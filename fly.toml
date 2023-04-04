@@ -1,0 +1,26 @@
+# fly.toml file generated for bitter-water-8033 on 2023-04-03T22:42:26-07:00
+
+app = "bitter-water-8033"
+kill_signal = "SIGINT"
+kill_timeout = 5
+mounts = []
+primary_region = "sjc"
+processes = []
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.ports]]
+    force_https = true
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
