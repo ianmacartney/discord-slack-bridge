@@ -5,11 +5,13 @@ specifiers:
   discord.js: ^14.9.0
   node-fetch: ^3.3.0
   prettier: ^2.8.4
+  typescript: ^5.0.3
 
 dependencies:
   convex: 0.12.2
   discord.js: 14.9.0
   node-fetch: 3.3.1
+  typescript: 5.0.3
 
 devDependencies:
   prettier: 2.8.7
@@ -543,6 +545,12 @@ packages:
 
   /tslib/2.5.0:
     resolution: {integrity: sha512-336iVw3rtn2BUK7ORdIAHTyxHGRIHVReokCR3XjbckJMK7ms8FysBfhLR8IXnAgy7T0PTPNBWKiH514FOW/WSg==}
+    dev: false
+
+  /typescript/5.0.3:
+    resolution: {integrity: sha512-xv8mOEDnigb/tN9PSMTwSEqAnUvkoXMQlicOb0IUVDBSQCgBSaAAROUZYy2IcUy5qU6XajK5jjjO7TMWqBTKZA==}
+    engines: {node: '>=12.20'}
+    hasBin: true
     dev: false
 
   /undici/5.21.0:
