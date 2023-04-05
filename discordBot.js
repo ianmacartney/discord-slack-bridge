@@ -45,9 +45,17 @@ bot.on("messageCreate", async (msg) => {
     channel,
     thread,
   };
-  console.log(args);
+  console.log(
+    `${author.username}: ${message.cleanContent} (${channel.id}/${
+      thread?.id ?? ""
+    })`
+  );
   // Upload to Convex
-  await convex.mutation("discord:receiveMessage")(args);
+  try {
+    await convex.mutation("discord:receiveMessage")(args);
+  } catch (e) {
+    console.error(e);
+  }
 });
 
 bot.on("messageUpdate", async (oldMsg, newMsg) => {
@@ -55,13 +63,21 @@ bot.on("messageUpdate", async (oldMsg, newMsg) => {
     previous: oldMsg.toJSON(),
     message: newMsg.toJSON(),
   };
-  console.log("update message");
-  await convex.mutation("discord:updateMessage")(args);
+  console.log("update message " + newMsg.id);
+  try {
+    await convex.mutation("discord:updateMessage")(args);
+  } catch (e) {
+    console.error(e);
+  }
 });
 
 bot.on("messageDelete", async (msg) => {
-  console.log("delete message");
-  await convex.mutation("discord:deleteMessage")(msg.toJSON());
+  console.log("delete message " + msg.id);
+  try {
+    await convex.mutation("discord:deleteMessage")(msg.toJSON());
+  } catch (e) {
+    console.error(e);
+  }
 });
 
 bot.on("threadUpdate", async (oldThread, newThread) => {
@@ -69,8 +85,12 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
     previous: serializeThread(oldThread),
     thread: serializeThread(newThread),
   };
-  console.log("update thread");
-  await convex.mutation("discord:updateThread")(args);
+  console.log("update thread " + newThread.id);
+  try {
+    await convex.mutation("discord:updateThread")(args);
+  } catch (e) {
+    console.error(e);
+  }
 });
 
 bot.on("interactionCreate", async (interaction) => {
