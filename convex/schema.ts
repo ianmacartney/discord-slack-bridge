@@ -29,6 +29,7 @@ export default defineSchema({
     rawPosition: s.number(),
     topic: s.string(),
     type: s.number(),
+    slackChannelId: s.optional(s.string()),
   }).index("id", ["id"]),
   messages: defineTable({
     activity: s.null(),
@@ -65,6 +66,7 @@ export default defineSchema({
     tts: s.boolean(),
     type: s.number(),
     webhookId: s.null(),
+    slackTs: s.optional(s.string()),
   }).index("id", ["id"]),
   threads: defineTable({
     appliedTags: s.array(s.string()),
@@ -89,6 +91,7 @@ export default defineSchema({
     rateLimitPerUser: s.number(),
     totalMessageSent: s.number(),
     type: s.number(),
+    slackThreadTs: s.optional(s.string()),
   }).index("id", ["id"]),
   users: defineTable({
     avatar: s.string(),

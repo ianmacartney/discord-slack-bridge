@@ -8,6 +8,7 @@
     "discord": "node discordBot.js"
   },
   "dependencies": {
+    "@slack/web-api": "^6.8.1",
     "convex": "^0.12.2",
     "discord.js": "^14.9.0",
     "node-fetch": "^3.3.0",

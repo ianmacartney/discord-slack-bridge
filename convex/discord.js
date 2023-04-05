@@ -71,9 +71,11 @@ export const updateMessage = mutation(
       .withIndex("id", (q) => q.eq("id", previous.id))
       .unique();
     await db.patch(existing._id, message);
-    if (existing.slackTs) {
+    const channel = await db.get(existing.channelId);
+    if (channel.slackChannelId && existing.slackTs) {
       scheduler.runAfter(0, "actions/slack:updateMessage", {
-        slackMessageTs: existing.slackTs,
+        messageTs: existing.slackTs,
+        channel: channel.slackChannelId,
       });
     }
   }
@@ -85,9 +87,11 @@ export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
     .withIndex("id", (q) => q.eq("id", message.id))
     .unique();
   await db.patch(existing._id, { deleted: true });
-  if (existing.slackTs) {
+  const channel = await db.get(existing.channelId);
+  if (channel.slackChannelId && existing.slackTs) {
     scheduler.runAfter(0, "actions/slack:deleteMessage", {
-      slackMessageTs: existing.slackTs,
+      messageTs: existing.slackTs,
+      channel: channel.slackChannelId,
     });
   }
 });
@@ -99,9 +103,11 @@ export const updateThread = mutation(
       .withIndex("id", (q) => q.eq("id", previous.id))
       .unique();
     await db.patch(existing._id, thread);
-    if (existing.slackTs) {
+    const channel = await db.get(existing.channelId);
+    if (channel.slackChannelId && existing.slackThreadTs) {
       scheduler.runAfter(0, "actions/slack:updateThread", {
-        threadId: existing.threadId,
+        channel: channel.slackChannelId,
+        threadTs: existing.slackThreadTs,
         emojis: dbThread?.appliedTags.map(
           (tagId) =>
             dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
