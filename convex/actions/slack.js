@@ -1,14 +1,25 @@
 import { internalAction } from "../_generated/server";
 import { WebClient } from "@slack/web-api";
 
+const slackClient = () => {
+  const token = process.env.SLACK_TOKEN;
+  if (!token) throw new Error("Specify SLACK_TOKEN in the dashboard");
+  return new WebClient(token);
+};
+
+const emojiName = new Map([
+  ["🪲", "beetle"],
+  ["✅", "white_check_mark"],
+  ["❔", "question"],
+  ["🎁", "gift"],
+]);
+
 export const sendMessage = internalAction(
   async (
     { runMutation },
     { messageId, threadId, author, text, channel, threadTs, emojis }
   ) => {
-    const token = process.env.SLACK_TOKEN;
-    if (!token) throw new Error("Specify SLACK_TOKEN in the dashboard");
-    const web = new WebClient(token);
+    const web = slackClient();
     const result = await web.chat.postMessage({
       text: `*${author.name ?? author.username}*: ${text}`,
       channel,
@@ -18,11 +29,14 @@ export const sendMessage = internalAction(
     });
     if (emojis) {
       for (const emoji of emojis) {
-        await web.reactions.add({
-          channel,
-          timestamp: threadTs || result.ts,
-          name: emoji,
-        });
+        const name = emojiName.get(emoji);
+        if (name) {
+          await web.reactions.add({
+            channel,
+            timestamp: threadTs || result.ts,
+            name,
+          });
+        }
       }
     }
     await runMutation("slack:sentMessage", {
