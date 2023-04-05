@@ -1,6 +1,6 @@
 import { mutation, internalMutation } from "./_generated/server";
 
-const addUnique = async (db, table, doc) => {
+const getOrCreate = async (db, table, doc) => {
   const existing = await db
     .query(table)
     .withIndex("id", (q) => q.eq("id", doc.id))
@@ -11,32 +11,30 @@ const addUnique = async (db, table, doc) => {
   return await db.insert(table, doc);
 };
 
-export const addUniqueDoc = internalMutation(
-  async ({ db }, { table, doc, primaryKey }) => {
-    return await addUnique(db, table, doc, primaryKey);
-  }
-);
+export const addUniqueDoc = internalMutation(async ({ db }, { table, doc }) => {
+  return await getOrCreate(db, table, doc);
+});
 
 export const addThreadBatch = internalMutation(
   async ({ db }, { authorsAndMessagesToAdd }) => {
     for (const [author, message] of authorsAndMessagesToAdd) {
-      const authorId = await addUnique(db, "users", author);
-      await addUnique(db, "messages", { ...message, authorId });
+      const authorId = await getOrCreate(db, "users", author);
+      await getOrCreate(db, "messages", { ...message, authorId });
     }
   }
 );
 
 export const receiveMessage = mutation(
   async ({ db, scheduler }, { author, message, channel, thread }) => {
-    const authorId = await addUnique(db, "users", author);
-    const channelId = await addUnique(db, "channels", channel);
+    const authorId = await getOrCreate(db, "users", author);
+    const channelId = await getOrCreate(db, "channels", channel);
     const dbChannel = await db.get(channelId);
     let dbThread, threadId;
     if (thread) {
-      threadId = await addUnique(db, "threads", { ...thread, channelId });
+      threadId = await getOrCreate(db, "threads", { ...thread, channelId });
       dbThread = await db.get(threadId);
     }
-    const messageId = await addUnique(db, "messages", {
+    const messageId = await getOrCreate(db, "messages", {
       ...message,
       authorId,
       channelId,
