@@ -89,19 +89,22 @@ export const deleteMessage = internalAction(
 
 export const updateThread = internalAction(
   async ({}, { channel, threadTs, title, channelName, emojis }) => {
+    const web = slackClient();
     await web.chat.update({
       channel,
-      ts: messageTs,
+      ts: threadTs,
       text: `${title} (${channelName})`,
     });
-    for (const emoji of emojis) {
-      const name = emojiName.get(emoji);
-      if (name) {
-        await web.reactions.add({
-          channel,
-          timestamp: threadTs,
-          name,
-        });
+    if (emojis) {
+      for (const emoji of emojis) {
+        const name = emojiName.get(emoji);
+        if (name) {
+          await web.reactions.add({
+            channel,
+            timestamp: threadTs,
+            name,
+          });
+        }
       }
     }
   }

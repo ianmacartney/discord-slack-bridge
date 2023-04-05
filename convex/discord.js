@@ -122,9 +122,9 @@ export const updateThread = mutation(
         threadTs: existing.slackThreadTs,
         title: thread.name,
         channelName: channel.name,
-        emojis: dbThread?.appliedTags.map(
+        emojis: existing?.appliedTags?.map(
           (tagId) =>
-            dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
+            channel.availableTags.find((t) => t.id === tagId)?.emoji.name
         ),
       });
     }
