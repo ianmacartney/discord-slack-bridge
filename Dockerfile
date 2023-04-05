@@ -19,4 +19,4 @@ COPY --chown=node:node ./package.json ./package.json
 COPY --chown=node:node ./shared/discordUtils.js ./shared/discordUtils.js
 COPY --from=builder /usr/src/app/node_modules /usr/src/app/node_modules
 
-CMD [ "node", "--es-module-specifier-resolution=node", "discordBot.js" ]
+CMD [ "node", "discordBot.js" ]

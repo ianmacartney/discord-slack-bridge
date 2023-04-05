@@ -5,10 +5,11 @@ import {
   serializeChannel,
   serializeMessage,
   serializeThread,
-} from "./shared/discordUtils";
+} from "./shared/discordUtils.js";
 
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");
+console.log(`Server address: ${deploymentUrl}`);
 const convex = new ConvexHttpClient(deploymentUrl);
 
 const bot = new Client({
@@ -46,9 +47,9 @@ bot.on("messageCreate", async (msg) => {
     thread,
   };
   console.log(
-    `${author.username}: ${message.cleanContent} (${channel.id}/${
-      thread?.id ?? ""
-    })`
+    `${args.author.username}: ${args.message.cleanContent} (${
+      args.channel.id
+    }/${args.thread?.id ?? ""})`
   );
   // Upload to Convex
   try {
