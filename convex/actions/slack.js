@@ -84,3 +84,57 @@ export const updateThread = internalAction(
     });
   }
 );
+
+export const initiateReply = internalAction(
+  async ({}, { slackUserId, triggerId, messageTs, message }) => {
+    const web = slackClient();
+    const resp = await web.views.open({
+      trigger_id: triggerId,
+      view: {
+        private_metadata: messageTs,
+        type: "modal",
+        title: {
+          type: "plain_text",
+          text: "Reply in Discord",
+          emoji: true,
+        },
+        submit: {
+          type: "plain_text",
+          text: "Reply",
+          emoji: true,
+        },
+        close: {
+          type: "plain_text",
+          text: "Cancel",
+          emoji: true,
+        },
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: message.text,
+            },
+          },
+          {
+            type: "divider",
+          },
+          {
+            type: "input",
+            block_id: "input",
+            element: {
+              type: "plain_text_input",
+              action_id: "reply",
+            },
+            label: {
+              type: "plain_text",
+              text: "Reply",
+              emoji: true,
+            },
+          },
+        ],
+      },
+    });
+    console.log(resp.ok);
+  }
+);

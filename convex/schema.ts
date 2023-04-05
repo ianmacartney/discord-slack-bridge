@@ -114,5 +114,6 @@ export default defineSchema({
     tag: s.string(),
     userId: s.string(),
     username: s.string(),
+    slackUserId: s.optional(s.string()),
   }).index("id", ["id"]),
 });

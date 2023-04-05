@@ -58,3 +58,13 @@ export const backfillDiscordChannel = internalAction(
     }
   }
 );
+
+export const replyFromSlack = internalAction(
+  async ({ runMutation }, { message, user, reply }) => {
+    console.log(message.threadId, message.channelId, user.id, reply);
+  }
+);
+
+export const resolveThread = internalAction(async ({ runMutation }, args) => {
+  console.log(args);
+});
