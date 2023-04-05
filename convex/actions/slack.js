@@ -17,12 +17,22 @@ const emojiName = new Map([
 export const sendMessage = internalAction(
   async (
     { runMutation },
-    { messageId, threadId, author, text, channel, threadTs, title, emojis }
+    {
+      messageId,
+      threadId,
+      author,
+      text,
+      channel,
+      channelName,
+      threadTs,
+      title,
+      emojis,
+    }
   ) => {
     const web = slackClient();
     if (threadId && !threadTs && title) {
       const threadMsg = await web.chat.postMessage({
-        text: title,
+        text: `${title} (${channelName})`,
         channel,
         icon_url: author.avatarUrl,
         mrkdwn: true,
@@ -78,8 +88,12 @@ export const deleteMessage = internalAction(
 );
 
 export const updateThread = internalAction(
-  async ({}, { channel, threadTs, title, emojis }) => {
-    await web.chat.update({ channel, ts: messageTs, text: title });
+  async ({}, { channel, threadTs, title, channelName, emojis }) => {
+    await web.chat.update({
+      channel,
+      ts: messageTs,
+      text: `${title} (${channelName})`,
+    });
     for (const emoji of emojis) {
       const name = emojiName.get(emoji);
       if (name) {

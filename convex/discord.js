@@ -54,6 +54,7 @@ export const receiveMessage = mutation(
         },
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
+        channelName: dbChannel.name,
         threadTs: dbThread?.slackThreadTs,
         title: dbThread?.name,
         emojis: dbThread?.appliedTags.map(
@@ -120,6 +121,7 @@ export const updateThread = mutation(
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
         title: thread.name,
+        channelName: channel.name,
         emojis: dbThread?.appliedTags.map(
           (tagId) =>
             dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
