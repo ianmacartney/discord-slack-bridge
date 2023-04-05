@@ -36,8 +36,7 @@ bot.on("messageCreate", async (msg) => {
     channel = serializeChannel(msg.channel.parent);
   } else {
     thread = undefined;
-    channel = msg.channel.toJSON();
-    delete channel["messages"];
+    channel = serializeChannel(msg.channel);
   }
 
   const args = {
