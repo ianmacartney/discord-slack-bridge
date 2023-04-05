@@ -41,7 +41,12 @@ export const receiveMessage = mutation(
       threadId,
     });
 
-    if (!author.bot && dbChannel.slackChannelId) {
+    if (
+      // 0: DEFAULT 19: REPLY
+      (message.type === 0 || message.type === 19) &&
+      !author.bot &&
+      dbChannel.slackChannelId
+    ) {
       scheduler.runAfter(0, "actions/slack:sendMessage", {
         messageId,
         threadId,
