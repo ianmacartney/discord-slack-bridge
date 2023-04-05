@@ -48,17 +48,30 @@ export const sendMessage = internalAction(
 );
 
 export const updateMessage = internalAction(
-  async ({}, { channel, messageTs }) => {}
+  async ({}, { channel, messageTs, text }) => {
+    const web = slackClient();
+    await web.chat.update({ channel, ts: messageTs, text });
+  }
 );
 
 export const deleteMessage = internalAction(
-  async ({}, { channel, messageTs }) => {}
+  async ({}, { channel, messageTs }) => {
+    const web = slackClient();
+    await web.chat.delete({ channel, ts: messageTs });
+  }
 );
 
 export const updateThread = internalAction(
   async ({}, { channel, threadTs, emojis }) => {
     for (const emoji of emojis) {
-      await web.reactions.add({ channel, timestamp: threadTs, name: emoji });
+      const name = emojiName.get(emoji);
+      if (name) {
+        await web.reactions.add({
+          channel,
+          timestamp: threadTs,
+          name,
+        });
+      }
     }
   }
 );

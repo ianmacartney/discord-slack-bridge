@@ -68,14 +68,16 @@ export const updateMessage = mutation(
   async ({ db, scheduler }, { previous, message }) => {
     const existing = await db
       .query("messages")
-      .withIndex("id", (q) => q.eq("id", previous.id))
+      .withIndex("id", (q) => q.eq("id", previous.id ?? message.id))
       .unique();
+    if (!existing) return;
     await db.patch(existing._id, message);
     const channel = await db.get(existing.channelId);
     if (channel.slackChannelId && existing.slackTs) {
       scheduler.runAfter(0, "actions/slack:updateMessage", {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
+        text: message.cleanContent,
       });
     }
   }
@@ -86,6 +88,7 @@ export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
     .query("messages")
     .withIndex("id", (q) => q.eq("id", message.id))
     .unique();
+  if (!existing) return;
   await db.patch(existing._id, { deleted: true });
   const channel = await db.get(existing.channelId);
   if (channel.slackChannelId && existing.slackTs) {
@@ -100,9 +103,10 @@ export const updateThread = mutation(
   async ({ db, scheduler }, { previous, thread }) => {
     const existing = await db
       .query("threads")
-      .withIndex("id", (q) => q.eq("id", previous.id))
+      .withIndex("id", (q) => q.eq("id", previous.id ?? thread.id))
       .unique();
     await db.patch(existing._id, thread);
+    if (!existing) return;
     const channel = await db.get(existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
       scheduler.runAfter(0, "actions/slack:updateThread", {
