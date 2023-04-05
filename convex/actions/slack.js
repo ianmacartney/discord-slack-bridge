@@ -34,7 +34,6 @@ export const sendMessage = internalAction(
       const threadMsg = await web.chat.postMessage({
         text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
         channel,
-        icon_url: author.avatarUrl,
         mrkdwn: true,
       });
       await runMutation("slack:startedThread", {
