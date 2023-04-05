@@ -134,3 +134,32 @@ export const updateThread = mutation(
     }
   }
 );
+
+const ResolvedTagId = "1088163249410818230";
+
+export const resolveThread = internalMutation(
+  async ({ db, scheduler }, { threadId }) => {
+    const thread = await db.get(threadId);
+    if (!thread) {
+      throw "Not a thread";
+    }
+    if (thread.appliedTags.indexOf(ResolvedTagId) !== -1) {
+      console.log("Tag already applied, refusing to apply");
+      return;
+    }
+    if (!thread.channelId) {
+      throw "No channel associated with the thread";
+    }
+    const channel = await db.get(thread.channelId);
+    if (!channel.availableTags.find((t) => t.id === ResolvedTagId)) {
+      console.log("Tag not found, refusing to apply");
+      return;
+    }
+    const tags = [...thread.appliedTags, ResolvedTagId];
+    await db.patch(threadId, { appliedTags: tags });
+    scheduler.runAfter(0, "actions/discord:applyTags", {
+      threadId: thread.id,
+      tags,
+    });
+  }
+);

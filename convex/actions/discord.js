@@ -7,18 +7,24 @@ import {
 import { internalAction } from "../_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 
+const discordClient = async () => {
+  const bot = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.MessageContent,
+    ],
+  });
+  const token = process.env.TOKEN;
+  if (!token) throw new Error("Specify discord TOKEN in the dashboard");
+  await bot.login(token);
+  return bot;
+};
+
 export const backfillDiscordChannel = internalAction(
   async ({ runMutation }, { discordId }) => {
-    const bot = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.MessageContent,
-      ],
-    });
-    const TOKEN = process.env.TOKEN;
-    await bot.login(TOKEN);
+    const bot = await discordClient();
     const channel = await bot.channels.fetch(discordId);
     await channel.guild.members.fetch();
     if (channel.type !== ChannelType.GuildForum) {
@@ -60,11 +66,17 @@ export const backfillDiscordChannel = internalAction(
 );
 
 export const replyFromSlack = internalAction(
-  async ({ runMutation }, { message, user, reply }) => {
-    console.log(message.threadId, message.channelId, user.id, reply);
+  async ({}, { channelId, user, reply }) => {
+    console.log(channelId, user.id, reply);
+    const bot = await discordClient();
+    const channel = await bot.channels.fetch(channelId);
+
+    await channel.send(`<@${user.id}>: ${reply}`);
   }
 );
 
-export const resolveThread = internalAction(async ({ runMutation }, args) => {
-  console.log(args);
+export const applyTags = internalAction(async ({}, { threadId, tags }) => {
+  const bot = await discordClient();
+  const thread = await bot.channels.fetch(threadId);
+  await thread.setAppliedTags(tags);
 });

@@ -63,6 +63,7 @@ export default defineSchema({
     roleSubscriptionData: s.null(),
     stickers: s.map(s.string(), s.any()),
     system: s.boolean(),
+    threadId: s.optional(s.id("threads")),
     tts: s.boolean(),
     type: s.number(),
     webhookId: s.null(),

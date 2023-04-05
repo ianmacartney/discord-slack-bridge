@@ -135,6 +135,6 @@ export const initiateReply = internalAction(
         ],
       },
     });
-    console.log(resp.ok);
+    console.log({ success: resp.ok });
   }
 );
