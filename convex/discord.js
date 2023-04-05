@@ -55,6 +55,7 @@ export const receiveMessage = mutation(
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         threadTs: dbThread?.slackThreadTs,
+        title: dbThread?.name,
         emojis: dbThread?.appliedTags.map(
           (tagId) =>
             dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
@@ -73,11 +74,17 @@ export const updateMessage = mutation(
     if (!existing) return;
     await db.patch(existing._id, message);
     const channel = await db.get(existing.channelId);
+    const author = await db.get(existing.authorId);
     if (channel.slackChannelId && existing.slackTs) {
       scheduler.runAfter(0, "actions/slack:updateMessage", {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent,
+        author: {
+          name: author.displayName,
+          username: author.username,
+          avatarUrl: author.displayAvatarURL || author.avatarUrl,
+        },
       });
     }
   }
@@ -112,6 +119,7 @@ export const updateThread = mutation(
       scheduler.runAfter(0, "actions/slack:updateThread", {
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
+        title: thread.name,
         emojis: dbThread?.appliedTags.map(
           (tagId) =>
             dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
