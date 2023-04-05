@@ -32,7 +32,7 @@ export const sendMessage = internalAction(
     const web = slackClient();
     if (threadId && !threadTs && title) {
       const threadMsg = await web.chat.postMessage({
-        text: `${title} (${channelName})`,
+        text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
         channel,
         icon_url: author.avatarUrl,
         mrkdwn: true,
@@ -50,18 +50,6 @@ export const sendMessage = internalAction(
       thread_ts: threadTs,
       mrkdwn: true,
     });
-    if (emojis) {
-      for (const emoji of emojis) {
-        const name = emojiName.get(emoji);
-        if (name) {
-          await web.reactions.add({
-            channel,
-            timestamp: threadTs || result.ts,
-            name,
-          });
-        }
-      }
-    }
     await runMutation("slack:sentMessage", {
       messageId,
       messageTs: result.ts,
@@ -93,19 +81,7 @@ export const updateThread = internalAction(
     await web.chat.update({
       channel,
       ts: threadTs,
-      text: `${title} (${channelName})`,
+      text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
     });
-    if (emojis) {
-      for (const emoji of emojis) {
-        const name = emojiName.get(emoji);
-        if (name) {
-          await web.reactions.add({
-            channel,
-            timestamp: threadTs,
-            name,
-          });
-        }
-      }
-    }
   }
 );
