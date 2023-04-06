@@ -7,13 +7,6 @@ const slackClient = () => {
   return new WebClient(token);
 };
 
-const emojiName = new Map([
-  ["🪲", "beetle"],
-  ["✅", "white_check_mark"],
-  ["❔", "question"],
-  ["🎁", "gift"],
-]);
-
 export const sendMessage = internalAction(
   async (
     { runMutation },

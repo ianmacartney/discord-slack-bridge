@@ -134,6 +134,7 @@ export const updateThread = mutation(
   }
 );
 
+// TODO: make generic and look up dynamically
 const ResolvedTagId = "1088163249410818230";
 
 export const resolveThread = internalMutation(

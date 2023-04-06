@@ -4,6 +4,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 
+// TODO: validate it came from slack
 export const interactivityHandler = httpEndpoint(
   async ({ runMutation, runAction, runQuery }, request) => {
     const bodyParams = new URLSearchParams(await request.text());
@@ -123,6 +124,7 @@ export const getUserBySlackId = internalQuery(
   }
 );
 
+// TODO: validate it came from slack
 export const slashHandler = httpEndpoint(async ({ runMutation }, request) => {
   console.log(request);
   return new Response();
