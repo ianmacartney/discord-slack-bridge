@@ -12,11 +12,12 @@ which allows us to discuss and reference and search support threads in slack.
 
 ### 1. Convex backend
 
-To run it against your own backend, `rm convex.json` first.
+To run it against your own backend:
 ```
 npx convex init
 npx convex deploy
 ```
+To save the configuration in your repo, remove "convex.json" from .gitignore.
 Copy the deployment URL for later (it should end with ".convex.cloud").
 
 ### 2. Discord Bot
