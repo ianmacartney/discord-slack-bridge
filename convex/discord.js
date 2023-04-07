@@ -96,7 +96,7 @@ export const updateMessage = mutation(
   }
 );
 
-export const migrateAuthorId = mutation(async ({ db }) => {
+export const migrateAuthorId = internalMutation(async ({ db }) => {
   const messages = await db.query("messages").collect();
   const users = await db.query("users").collect();
   const channels = await db.query("channels").collect();
@@ -106,20 +106,30 @@ export const migrateAuthorId = mutation(async ({ db }) => {
       const user = users.find((u) => u.id === message.authorId);
       if (!user) {
         console.log(`Message ${message.id} missing user ${message.authorId}`);
+      } else {
+        await db.patch(message._id, { authorId: user._id });
       }
-      await db.patch(message._id, { authorId: user._id });
     }
     if (typeof message.channelId === "string") {
-      const channel = channels.find((u) => u.id === message.channelId);
-      if (!channel) {
-        console.log(
-          `Message ${message.id} missing channel ${message.channelId}`
-        );
+      console.log("fixing " + message.id);
+      if (message.threadId) {
+        const thread = await db.get(message.threadId);
+        await db.patch(message._id, { channelId: thread.channelId });
+        console.log("to " + thread.channelId.id);
+      } else {
+        const channel = channels.find((u) => u.id === message.channelId);
+        if (!channel) {
+          console.log(
+            `Message ${message.id} missing channel ${message.channelId}`
+          );
+        } else {
+          await db.patch(message._id, { channelId: channel._id });
+          console.log("to " + channel.channelId.id);
+        }
       }
-      await db.patch(message._id, { channelId: channel._id });
     }
   }
-  console.log("done");
+  console.log("done " + messages.length);
 });
 
 export const deleteMessage = mutation(async ({ db, scheduler }, message) => {

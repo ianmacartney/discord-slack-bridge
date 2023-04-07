@@ -126,7 +126,7 @@ export default defineSchema({
     slackThreadTs: s.optional(s.string()),
     totalMessageSent: s.number(),
     type: s.number(),
-  }),
+  }).index("id", ["id"]),
   users: defineTable({
     avatar: s.union(s.null(), s.string()),
     avatarURL: s.union(s.null(), s.string()),
