@@ -60,8 +60,8 @@ bot.on("messageCreate", async (msg) => {
 
 bot.on("messageUpdate", async (oldMsg, newMsg) => {
   const args = {
-    previous: oldMsg.toJSON(),
-    message: newMsg.toJSON(),
+    previous: serializeMessage(oldMsg),
+    message: serializeMessage(newMsg),
   };
   console.log("update message " + newMsg.id);
   try {

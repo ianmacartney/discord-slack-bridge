@@ -76,9 +76,11 @@ export const updateMessage = mutation(
       .withIndex("id", (q) => q.eq("id", previous.id ?? message.id))
       .unique();
     if (!existing) return;
-    await db.patch(existing._id, message);
-    const channel = await db.get(existing.channelId);
-    const author = await db.get(existing.authorId);
+    const { authorId, channelId } = existing;
+    // Overwrite authorId & channelId
+    await db.patch(existing._id, { ...message, authorId, channelId });
+    const channel = await db.get(channelId);
+    const author = await db.get(authorId);
     if (channel.slackChannelId && existing.slackTs) {
       scheduler.runAfter(0, "actions/slack:updateMessage", {
         messageTs: existing.slackTs,
