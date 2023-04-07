@@ -1,7 +1,12 @@
 # Discord Slack Bridge with Convex
 
 Sync messages & threads from Discord into Slack.
-It will keep Discord threads in Slack
+It will turn Discord threads into Slack threads, replying in the right thread on
+new messages.
+
+My usecase is to mirror our "#support" forum in Discord into a Slack channel, so
+folks here don't have to periodically switch from Slack to Discord to scan, and
+which allows us to discuss and reference and search support threads in slack.
 
 ## Installation
 
@@ -45,7 +50,7 @@ I did have to enter my CC info, but it hasn't been charged.
 Once messages are coming in, you'll see the channels listed in the Convex
 dashboard. You can edit a given channel and add `slackChannelId: "C0123456ABC"`
 for your corresponding slack channel IDs. Then, new messages will get posted to
-Slack. Hooray!
+Slack, only for the Discord channels you want. Hooray!
 
 ## Backfill
 
@@ -56,6 +61,15 @@ Run it with a single parameter: `{ discordId: "1111111111111111111" }`
 replacing the 1's with your discord ID.
 
 Tip: In discord you can right-click various things and click "Copy ID"
+
+I chose not to have this send these all to Slack, but instead just backfill into
+the database. Doing it multiple times won't duplicate data, it won't overwrite
+anything that already exists (unique on discord "id" field). If you wanted,
+you could have it send the slack messages, but you'd probably want to make sure
+you iterate over all the messages in order, so they're in order in Slack too.
+
+For me, I just wanted the thread names and content to be in my DB for future
+reference, e.g. to index it for search or train GPT.
 
 ## Debugging
 
