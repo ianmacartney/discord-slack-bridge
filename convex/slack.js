@@ -112,6 +112,10 @@ export const getChannelIdByTs = internalQuery(async ({ db }, { messageTs }) => {
     const thread = await db.get(message.threadId);
     return thread.id;
   }
+  if (message && message.channelId) {
+    const channel = await db.get(message.channelId);
+    return channel.id;
+  }
   return null;
 });
 
