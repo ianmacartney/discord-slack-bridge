@@ -96,42 +96,6 @@ export const updateMessage = mutation(
   }
 );
 
-export const migrateAuthorId = internalMutation(async ({ db }) => {
-  const messages = await db.query("messages").collect();
-  const users = await db.query("users").collect();
-  const channels = await db.query("channels").collect();
-  console.log("loaded");
-  for (const message of messages) {
-    if (typeof message.authorId === "string") {
-      const user = users.find((u) => u.id === message.authorId);
-      if (!user) {
-        console.log(`Message ${message.id} missing user ${message.authorId}`);
-      } else {
-        await db.patch(message._id, { authorId: user._id });
-      }
-    }
-    if (typeof message.channelId === "string") {
-      console.log("fixing " + message.id);
-      if (message.threadId) {
-        const thread = await db.get(message.threadId);
-        await db.patch(message._id, { channelId: thread.channelId });
-        console.log("to " + thread.channelId.id);
-      } else {
-        const channel = channels.find((u) => u.id === message.channelId);
-        if (!channel) {
-          console.log(
-            `Message ${message.id} missing channel ${message.channelId}`
-          );
-        } else {
-          await db.patch(message._id, { channelId: channel._id });
-          console.log("to " + channel.channelId.id);
-        }
-      }
-    }
-  }
-  console.log("done " + messages.length);
-});
-
 export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
   const existing = await db
     .query("messages")
