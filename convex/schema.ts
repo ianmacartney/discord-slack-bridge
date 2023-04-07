@@ -1,49 +1,75 @@
-import { defineSchema, defineTable } from "convex/schema";
-import { s } from "convex/schema";
+import { defineSchema, defineTable, s } from "convex/schema";
 
 export default defineSchema({
   channels: defineTable({
-    availableTags: s.array(
-      s.object({
-        emoji: s.null(),
-        id: s.string(),
-        moderated: s.boolean(),
-        name: s.string(),
-      })
+    availableTags: s.optional(
+      s.array(
+        s.object({
+          emoji: s.union(
+            s.null(),
+            s.object({ id: s.null(), name: s.string() })
+          ),
+          id: s.string(),
+          moderated: s.boolean(),
+          name: s.string(),
+        })
+      )
     ),
     createdTimestamp: s.number(),
-    defaultAutoArchiveDuration: s.null(),
-    defaultForumLayout: s.number(),
-    defaultReactionEmoji: s.object({ id: s.null(), name: s.string() }),
-    defaultSortOrder: s.null(),
-    defaultThreadRateLimitPerUser: s.null(),
+    defaultAutoArchiveDuration: s.optional(s.null()),
+    defaultForumLayout: s.optional(s.number()),
+    defaultReactionEmoji: s.optional(
+      s.object({ id: s.null(), name: s.string() })
+    ),
+    defaultSortOrder: s.optional(s.null()),
+    defaultThreadRateLimitPerUser: s.optional(s.null()),
     flags: s.number(),
     guild: s.string(),
     guildId: s.string(),
     id: s.string(),
+    lastMessageId: s.optional(s.string()),
     name: s.string(),
     nsfw: s.boolean(),
     parentId: s.string(),
     permissionOverwrites: s.array(s.string()),
     rateLimitPerUser: s.number(),
     rawPosition: s.number(),
+    slackChannelId: s.optional(s.string()),
     topic: s.string(),
     type: s.number(),
-    slackChannelId: s.optional(s.string()),
   }).index("id", ["id"]),
   messages: defineTable({
     activity: s.null(),
     applicationId: s.null(),
-    attachments: s.map(s.string(), s.any()),
+    attachments: s.array(s.string()),
     authorId: s.id("users"),
     channelId: s.id("channels"),
     cleanContent: s.string(),
     components: s.array(s.any()),
     content: s.string(),
     createdTimestamp: s.number(),
-    editedTimestamp: s.null(),
-    embeds: s.array(s.any()),
+    deleted: s.optional(s.boolean()),
+    editedTimestamp: s.union(s.null(), s.number()),
+    embeds: s.array(
+      s.object({
+        color: s.optional(s.number()),
+        description: s.string(),
+        provider: s.optional(s.object({ name: s.string() })),
+        thumbnail: s.optional(
+          s.object({
+            height: s.number(),
+            proxy_url: s.string(),
+            url: s.string(),
+            width: s.number(),
+          })
+        ),
+        title: s.string(),
+        type: s.string(),
+        url: s.string(),
+      })
+    ),
     flags: s.number(),
+    groupActivityApplicationId: s.null(),
     guildId: s.string(),
     id: s.string(),
     interaction: s.null(),
@@ -52,22 +78,29 @@ export default defineSchema({
       crosspostedChannels: s.array(s.string()),
       everyone: s.boolean(),
       members: s.array(s.string()),
-      repliedUser: s.null(),
-      roles: s.array(s.string()),
+      repliedUser: s.union(s.null(), s.string()),
+      roles: s.array(s.any()),
       users: s.array(s.string()),
     }),
-    nonce: s.string(),
+    nonce: s.union(s.null(), s.string()),
     pinned: s.boolean(),
-    position: s.number(),
-    reference: s.null(),
+    position: s.union(s.null(), s.number()),
+    reference: s.union(
+      s.null(),
+      s.object({
+        channelId: s.string(),
+        guildId: s.string(),
+        messageId: s.string(),
+      })
+    ),
     roleSubscriptionData: s.null(),
-    stickers: s.map(s.string(), s.any()),
+    slackTs: s.optional(s.string()),
+    stickers: s.array(s.any()),
     system: s.boolean(),
     threadId: s.optional(s.id("threads")),
     tts: s.boolean(),
     type: s.number(),
     webhookId: s.null(),
-    slackTs: s.optional(s.string()),
   }).index("id", ["id"]),
   threads: defineTable({
     appliedTags: s.array(s.string()),
@@ -90,13 +123,13 @@ export default defineSchema({
     ownerId: s.string(),
     parentId: s.string(),
     rateLimitPerUser: s.number(),
+    slackThreadTs: s.optional(s.string()),
     totalMessageSent: s.number(),
     type: s.number(),
-    slackThreadTs: s.optional(s.string()),
-  }).index("id", ["id"]),
+  }),
   users: defineTable({
-    avatar: s.string(),
-    avatarURL: s.string(),
+    avatar: s.union(s.null(), s.string()),
+    avatarURL: s.union(s.null(), s.string()),
     bot: s.boolean(),
     createdTimestamp: s.number(),
     defaultAvatarURL: s.string(),
@@ -108,13 +141,13 @@ export default defineSchema({
     id: s.string(),
     joinedTimestamp: s.number(),
     memberId: s.string(),
-    nickname: s.string(),
+    nickname: s.union(s.null(), s.string()),
     pending: s.boolean(),
     roles: s.array(s.string()),
+    slackUserId: s.optional(s.string()),
     system: s.boolean(),
     tag: s.string(),
     userId: s.string(),
     username: s.string(),
-    slackUserId: s.optional(s.string()),
   }).index("id", ["id"]),
 });
