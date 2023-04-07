@@ -128,7 +128,7 @@ export const updateThread = mutation(
         threadTs: existing.slackThreadTs,
         title: thread.name,
         channelName: channel.name,
-        emojis: existing?.appliedTags?.map(
+        emojis: thread.appliedTags?.map(
           (tagId) =>
             channel.availableTags.find((t) => t.id === tagId)?.emoji.name
         ),
