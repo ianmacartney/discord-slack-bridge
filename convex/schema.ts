@@ -53,7 +53,7 @@ export default defineSchema({
     embeds: s.array(
       s.object({
         color: s.optional(s.number()),
-        description: s.string(),
+        description: s.optional(s.string()),
         provider: s.optional(s.object({ name: s.string() })),
         thumbnail: s.optional(
           s.object({
@@ -63,7 +63,7 @@ export default defineSchema({
             width: s.number(),
           })
         ),
-        title: s.string(),
+        title: s.optional(s.string()),
         type: s.string(),
         url: s.string(),
       })
@@ -75,7 +75,7 @@ export default defineSchema({
     interaction: s.null(),
     mentions: s.object({
       channels: s.array(s.string()),
-      crosspostedChannels: s.array(s.string()),
+      crosspostedChannels: s.array(s.any()),
       everyone: s.boolean(),
       members: s.array(s.string()),
       repliedUser: s.union(s.null(), s.string()),
@@ -90,7 +90,7 @@ export default defineSchema({
       s.object({
         channelId: s.string(),
         guildId: s.string(),
-        messageId: s.string(),
+        messageId: s.optional(s.string()),
       })
     ),
     roleSubscriptionData: s.null(),
