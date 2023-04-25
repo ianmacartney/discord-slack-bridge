@@ -1,3 +1,4 @@
+"use node";
 import {
   serializeAuthor,
   serializeChannel,

@@ -1,3 +1,4 @@
+"use node";
 import { internalAction } from "../_generated/server";
 import { WebClient } from "@slack/web-api";
 
