@@ -2,7 +2,7 @@ lockfileVersion: 5.4
 
 specifiers:
   '@slack/web-api': ^6.8.1
-  convex: ^0.12.2
+  convex: ^0.13.0
   discord.js: ^14.9.0
   node-fetch: ^3.3.0
   prettier: ^2.8.4
@@ -10,7 +10,7 @@ specifiers:
 
 dependencies:
   '@slack/web-api': 6.8.1
-  convex: 0.12.2
+  convex: 0.13.0
   discord.js: 14.9.0
   node-fetch: 3.3.1
   typescript: 5.0.3
@@ -186,8 +186,8 @@ packages:
       delayed-stream: 1.0.0
     dev: false
 
-  /convex/0.12.2:
-    resolution: {integrity: sha512-ZJURjX9709eIRU34QlKZQUmhDVkHGQPHeJ0MVF2CAlL5Auv1I35MklPjFcgvZyCgc5qvGdGORm9y98zvFDV3Cw==}
+  /convex/0.13.0:
+    resolution: {integrity: sha512-9YEtY2pWyExnpfS0K7DomY+pdl2i9LgDnN4am4eUkLHQ0u1j7USqmE6AAz3oBWyjsqJuiqyvIEW18K7c/JDtXg==}
     engines: {node: '>=16.15.1', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -208,6 +208,7 @@ packages:
       base64-js: 1.5.1
       encoding: 0.1.13
       esbuild: 0.15.18
+      jwt-decode: 3.1.2
       node-fetch: 2.6.9_encoding@0.1.13
     dev: false
 
@@ -549,6 +550,10 @@ packages:
   /is-stream/1.1.0:
     resolution: {integrity: sha512-uQPm8kcs47jx38atAcWTVxyltQYoPT68y9aWYdV6yWXSyW8mzSat0TL6CiWdZeCdF3KrAvpVtnHbTv4RN+rqdQ==}
     engines: {node: '>=0.10.0'}
+    dev: false
+
+  /jwt-decode/3.1.2:
+    resolution: {integrity: sha512-UfpWE/VZn0iP50d8cz9NrZLM9lSWhcJ+0Gt/nm4by88UL+J1SiKN8/5dkjMmbEzwL2CAe+67GsegCbIKtbp75A==}
     dev: false
 
   /lodash.snakecase/4.1.1:
