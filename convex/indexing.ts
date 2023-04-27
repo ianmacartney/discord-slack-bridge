@@ -6,13 +6,19 @@ import {
   query,
 } from "./_generated/server";
 
+const CONVEXER_ROLE = "1019375583387463710";
+
 export type DiscordDocument = {
   objectID: string;
   title: string;
   date: number;
   channel: string;
   messages: {
-    author: string;
+    author: {
+      name: string;
+      avatar: string;
+      convexer: boolean;
+    };
     body: string;
   }[];
   tags: string[];
@@ -51,14 +57,20 @@ const hydrateSearchDocument = async ({
   // Username resolution with memoization.
   var finalMessages = [];
   for (const message of messages) {
-    const authorName = (await db.get(message.authorId))?.displayName ?? "";
+    const author = (await db.get(message.authorId))!;
+    const authorName = author.displayName ?? "";
+    const avatarUrl = author.displayAvatarURL ?? "";
+    const convexer = author.roles.includes(CONVEXER_ROLE);
     finalMessages.push({
-      author: authorName,
+      author: {
+        name: authorName,
+        avatar: avatarUrl,
+        convexer,
+      },
       body: message.cleanContent,
     });
   }
 
-  console.log("chan name is ", chan.name);
   return {
     title: thread.name,
     objectID: thread.id,
