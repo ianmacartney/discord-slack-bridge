@@ -86,6 +86,27 @@ reference, e.g. to index it for search or train GPT.
   in discordBot.js, maybe `unhandledMessageUpdate` would be useful?
   If you do that, send a PR please 🙏.
 
+## Search indexing
+
+This repository also includes a cron job that ensures the appropriate discord
+threads are indexed into Algolia for use in search. By default, this job
+scans every minute for updated threads that may be eligible for indexing.
+
+Don't worry! By default nothing is being indexed. But... what if you want
+to start indexing in your installation? Here's how it's done:
+
+1.  Add ALGOLIA_API_KEY to the deployment environment
+2.  Set a boolean field called `indexForSearch` to `true` on any channel records
+    that are appropriate. Typically this will just be the support forum channel.
+3.  To reset the thread index scanning cursor, go into the `threadSearchStatus`
+    table and update the `indexedCursor` number field to 0. This will ensure all
+    threads get re-scanned for indexing eligibility
+
+After that, any new or updated discord threads in the appopriate channel(s) will
+be added to the Algolia index within a minute. If you ever change the document
+structure, or for any other reason want to trigger a complete re-indexing of
+Algolia, just repeat step (3) above and set the cursor back to zero.
+
 ## Extras
 
 It has some code to handle slash commands, interactions, etc.
