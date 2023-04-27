@@ -10,6 +10,7 @@ export type DiscordDocument = {
   objectID: string;
   title: string;
   date: number;
+  channel: string;
   messages: {
     author: string;
     body: string;
@@ -20,17 +21,20 @@ export type DiscordDocument = {
 const hydrateSearchDocument = async ({
   db,
   thread,
-  tagMap,
+  chanInfo,
 }: {
   db: DatabaseReader;
   thread: Doc<"threads">;
-  tagMap: TagMap;
-}): Promise<DiscordDocument> => {
+  chanInfo: ChanInfo;
+}): Promise<DiscordDocument | null> => {
   // Let's hydrate the tags...
-  const chanTags = tagMap.get(thread.channelId.toString())!;
+  const chan = chanInfo.get(thread.channelId.toString())!;
+  if (!chan.include) {
+    return null; // This channel is not being indexed for search.
+  }
   var tags = [];
   for (const tag of thread.appliedTags) {
-    const tagName: string | null = chanTags.get(tag) ?? null;
+    const tagName: string | null = chan.tagMap.get(tag) ?? null;
     if (tagName) {
       tags.push(tagName);
     }
@@ -54,18 +58,27 @@ const hydrateSearchDocument = async ({
     });
   }
 
+  console.log("chan name is ", chan.name);
   return {
     title: thread.name,
     objectID: thread.id,
+    channel: chan.name,
     tags,
     messages: finalMessages,
     date: thread.createdTimestamp,
   };
 };
 
-type TagMap = Map<string, Map<string, string>>;
+type ChanInfo = Map<
+  string,
+  { include: boolean; tagMap: Map<string, string>; name: string }
+>;
 
-const resolveTags = async ({ db }: { db: DatabaseReader }): Promise<TagMap> => {
+const getChanInfo = async ({
+  db,
+}: {
+  db: DatabaseReader;
+}): Promise<ChanInfo> => {
   // Resolve tags.
   const channels = await db.query("channels").collect();
   const tagMap = new Map();
@@ -74,7 +87,11 @@ const resolveTags = async ({ db }: { db: DatabaseReader }): Promise<TagMap> => {
     for (const t of c.availableTags ?? []) {
       chanMap.set(t.id, t.name);
     }
-    tagMap.set(c._id.toString(), chanMap);
+    tagMap.set(c._id.toString(), {
+      tagMap: chanMap,
+      name: c.name,
+      include: c.indexForSearch ?? false,
+    });
   }
   return tagMap;
 };
@@ -97,10 +114,13 @@ export const updatedSearchDocuments = query(
       return { documents: [], position: null };
     }
 
-    const tagMap = await resolveTags({ db });
+    const chanInfo = await getChanInfo({ db });
     var hydratedBatch = [];
     for (const thread of newThreadBatch) {
-      hydratedBatch.push(await hydrateSearchDocument({ db, thread, tagMap }));
+      const hyDoc = await hydrateSearchDocument({ db, thread, chanInfo });
+      if (hyDoc) {
+        hydratedBatch.push(hyDoc);
+      }
     }
     return {
       documents: hydratedBatch,

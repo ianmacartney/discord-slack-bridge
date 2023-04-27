@@ -28,6 +28,7 @@ export default defineSchema({
     guild: v.string(),
     guildId: v.string(),
     id: v.string(),
+    indexForSearch: v.optional(v.boolean()),
     lastMessageId: v.optional(v.string()),
     name: v.string(),
     nsfw: v.boolean(),

@@ -13,6 +13,7 @@ import type { ApiFromModules } from "convex/api";
 import type * as actions_algolia from "../actions/algolia";
 import type * as actions_discord from "../actions/discord";
 import type * as actions_slack from "../actions/slack";
+import type * as crons from "../crons";
 import type * as discord from "../discord";
 import type * as http from "../http";
 import type * as indexing from "../indexing";
@@ -31,6 +32,7 @@ export type API = ApiFromModules<{
   "actions/algolia": typeof actions_algolia;
   "actions/discord": typeof actions_discord;
   "actions/slack": typeof actions_slack;
+  crons: typeof crons;
   discord: typeof discord;
   http: typeof http;
   indexing: typeof indexing;
