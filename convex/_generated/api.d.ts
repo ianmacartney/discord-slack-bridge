@@ -10,10 +10,12 @@
  */
 
 import type { ApiFromModules } from "convex/api";
+import type * as actions_algolia from "../actions/algolia";
 import type * as actions_discord from "../actions/discord";
 import type * as actions_slack from "../actions/slack";
 import type * as discord from "../discord";
 import type * as http from "../http";
+import type * as indexing from "../indexing";
 import type * as slack from "../slack";
 
 /**
@@ -26,9 +28,11 @@ import type * as slack from "../slack";
  * `ConvexReactClient` to create app-specific types.
  */
 export type API = ApiFromModules<{
+  "actions/algolia": typeof actions_algolia;
   "actions/discord": typeof actions_discord;
   "actions/slack": typeof actions_slack;
   discord: typeof discord;
   http: typeof http;
+  indexing: typeof indexing;
   slack: typeof slack;
 }>;

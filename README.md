@@ -13,10 +13,12 @@ which allows us to discuss and reference and search support threads in slack.
 ### 1. Convex backend
 
 To run it against your own backend:
+
 ```
 npx convex init
 npx convex deploy
 ```
+
 To save the configuration in your repo, remove "convex.json" from .gitignore.
 Copy the deployment URL for later (it should end with ".convex.cloud").
 
@@ -24,13 +26,13 @@ Copy the deployment URL for later (it should end with ".convex.cloud").
 
 1. Create a bot and authorize it, adding it to your server / guild.
 2. Copy the token and save it in the environment variables in the dashboard
- with the key TOKEN. `npx convex dashboard` to get there.
+   with the key TOKEN. `npx convex dashboard` to get there.
 
 ### 3. Slack Bot
 
 1. Create a slack bot and install it into your workspace.
 2. Copy the bot oauth token and save it in the convex environment variables as
- SLACK_TOKEN.
+   SLACK_TOKEN.
 
 ### 4. discordBot.js on fly.io
 
@@ -40,8 +42,8 @@ Deploy the discordBot.js to fly.io:
 2. Deploy it the first time with `fly launch`, then `fly deploy` after.
 
 3. Set the environment variables for it with:
-flyctl secrets set TOKEN=<discord-token>
-flyctl secrets set CONVEX_URL=<deployment-URL>
+   flyctl secrets set TOKEN=<discord-token>
+   flyctl secrets set CONVEX_URL=<deployment-URL>
 
 I just chose one instance in sjc, on the smallest (free) tier.
 I did have to enter my CC info, but it hasn't been charged.
@@ -77,12 +79,12 @@ reference, e.g. to index it for search or train GPT.
 - You can look at your discordBot.js logs in the fly.io dashboard under monitoring.
 - You can see your convex functions in the convex dashboard under Logs
 - You might run into issues where your bots need extra permissions and you need
-to re-install them into the workspace / guild to get the right oauth token.
+  to re-install them into the workspace / guild to get the right oauth token.
 - The discord bot doesn't catch updates to messages sent before it started
-up, but going forward, message updates / deletes should be sent along to slack.
-There's a `discord-logs` npm package that adds more events we could listen to
-in discordBot.js, maybe `unhandledMessageUpdate` would be useful?
-If you do that, send a PR please 🙏.
+  up, but going forward, message updates / deletes should be sent along to slack.
+  There's a `discord-logs` npm package that adds more events we could listen to
+  in discordBot.js, maybe `unhandledMessageUpdate` would be useful?
+  If you do that, send a PR please 🙏.
 
 ## Extras
 
@@ -99,11 +101,12 @@ configured as "message" shortcuts. So you can right-click a message and send a
 reply to Discord.
 
 - For resolve, you'll need to update the code to pass the
-right Tag ID. For us, we have a tag in our support channel for "Resolved".
+  right Tag ID. For us, we have a tag in our support channel for "Resolved".
 - For reply, you can add your `slackUserId: "U01234ABCDE",` in the `users`
-table. It won't reply as you, but it'll tag you in the reply.
+  table. It won't reply as you, but it'll tag you in the reply.
 
 Tip: you can get all your slack users & ids by running:
+
 ```
 $ node
 

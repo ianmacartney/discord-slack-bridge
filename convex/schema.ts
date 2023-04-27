@@ -102,7 +102,9 @@ export default defineSchema({
     tts: v.boolean(),
     type: v.number(),
     webhookId: v.null(),
-  }).index("id", ["id"]),
+  })
+    .index("id", ["id"])
+    .index("threadId", ["threadId"]),
   threads: defineTable({
     appliedTags: v.array(v.string()),
     archiveTimestamp: v.number(),
@@ -127,7 +129,10 @@ export default defineSchema({
     slackThreadTs: v.optional(v.string()),
     totalMessageSent: v.number(),
     type: v.number(),
-  }).index("id", ["id"]),
+    version: v.optional(v.number()),
+  })
+    .index("id", ["id"])
+    .index("version", ["version"]),
   users: defineTable({
     avatar: v.union(v.null(), v.string()),
     avatarURL: v.union(v.null(), v.string()),
@@ -151,10 +156,7 @@ export default defineSchema({
     userId: v.string(),
     username: v.string(),
   }).index("id", ["id"]),
-  threadMembers: defineTable({
-    threadId: v.id("threads"),
-    userId: v.id("users"),
-  })
-    .index("by_threadId", ["threadId"])
-    .index("by_userId", ["userId"]),
+  threadSearchStatus: defineTable({
+    indexedCursor: v.number(),
+  }),
 });

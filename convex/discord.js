@@ -11,8 +11,26 @@ const getOrCreate = async (db, table, doc) => {
   return await db.insert(table, doc);
 };
 
+const touchThread = async ({ db }, { threadId }) => {
+  // Get maximum version from any thread.
+  const mostRecent = await db
+    .query("threads")
+    .withIndex("version")
+    .order("desc")
+    .first();
+  const nextVersion = (mostRecent?.version ?? 0) + 1;
+  await db.patch(threadId, { version: nextVersion });
+};
+
 export const addUniqueDoc = internalMutation(async ({ db }, { table, doc }) => {
   return await getOrCreate(db, table, doc);
+});
+
+export const forceRefreshVersions = internalMutation(async ({ db }, {}) => {
+  const ids = (await db.query("threads").collect()).map((d) => d._id);
+  for (const threadId of ids) {
+    await touchThread({ db }, { threadId });
+  }
 });
 
 export const addThreadBatch = internalMutation(
@@ -33,6 +51,7 @@ export const receiveMessage = mutation(
     let dbThread, threadId;
     if (thread) {
       threadId = await getOrCreate(db, "threads", { ...thread, channelId });
+      await touchThread({ db }, { threadId });
       dbThread = await db.get(threadId);
     }
     const messageId = await getOrCreate(db, "messages", {
@@ -77,7 +96,10 @@ export const updateMessage = mutation(
       .withIndex("id", (q) => q.eq("id", previous.id ?? message.id))
       .unique();
     if (!existing) return;
-    const { authorId, channelId } = existing;
+    const { authorId, channelId, threadId } = existing;
+    if (threadId) {
+      await touchThread({ db }, { threadId });
+    }
     // Overwrite authorId & channelId
     await db.patch(existing._id, { ...message, authorId, channelId });
     const channel = await db.get(channelId);
@@ -104,6 +126,10 @@ export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
     .unique();
   if (!existing) return;
   await db.patch(existing._id, { deleted: true });
+  const { threadId } = existing;
+  if (threadId) {
+    await touchThread({ db }, { threadId });
+  }
   const channel = await db.get(existing.channelId);
   if (channel.slackChannelId && existing.slackTs) {
     scheduler.runAfter(0, "actions/slack:deleteMessage", {
@@ -119,8 +145,9 @@ export const updateThread = mutation(
       .query("threads")
       .withIndex("id", (q) => q.eq("id", previous.id ?? thread.id))
       .unique();
-    await db.patch(existing._id, thread);
     if (!existing) return;
+    await touchThread({ db }, { threadId });
+    await db.patch(existing._id, thread);
     const channel = await db.get(existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
       scheduler.runAfter(0, "actions/slack:updateThread", {
@@ -159,7 +186,10 @@ export const resolveThread = internalMutation(
       return;
     }
     const tags = [...thread.appliedTags, ResolvedTagId];
-    await db.patch(threadId, { appliedTags: tags });
+    await db.patch(threadId, {
+      appliedTags: tags,
+    });
+    await touchThread({ db }, { threadId });
     scheduler.runAfter(0, "actions/discord:applyTags", {
       threadId: thread.id,
       tags,
