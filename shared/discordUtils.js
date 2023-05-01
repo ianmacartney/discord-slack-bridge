@@ -8,6 +8,7 @@ export function serializeThread(discordThread) {
 export function serializeChannel(discordChannel) {
   const channel = discordChannel.toJSON();
   delete channel["threads"];
+  delete channel["messages"];
   return channel;
 }
 
