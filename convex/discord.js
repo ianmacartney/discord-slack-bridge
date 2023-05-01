@@ -45,6 +45,8 @@ export const addThreadBatch = internalMutation(
 export const receiveMessage = mutation(
   async ({ db, scheduler }, { author, message, channel, thread }) => {
     const authorId = await getOrCreate(db, "users", author);
+    // TODO: once the discordBot goes out stripping this we can remove it.
+    delete channel["messages"];
     /** @type { import("./_generated/dataModel").Id<"channels">} */
     const channelId = await getOrCreate(db, "channels", channel);
     const dbChannel = await db.get(channelId);
