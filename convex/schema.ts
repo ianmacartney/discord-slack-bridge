@@ -34,10 +34,10 @@ export default defineSchema({
     nsfw: v.boolean(),
     parentId: v.string(),
     permissionOverwrites: v.array(v.string()),
-    rateLimitPerUser: v.number(),
+    rateLimitPerUser: v.optional(v.number()),
     rawPosition: v.number(),
     slackChannelId: v.optional(v.string()),
-    topic: v.string(),
+    topic: v.union(v.null(), v.string()),
     type: v.number(),
   }).index("id", ["id"]),
   messages: defineTable({
@@ -52,24 +52,7 @@ export default defineSchema({
     createdTimestamp: v.number(),
     deleted: v.optional(v.boolean()),
     editedTimestamp: v.union(v.null(), v.number()),
-    embeds: v.array(
-      v.object({
-        color: v.optional(v.number()),
-        description: v.optional(v.string()),
-        provider: v.optional(v.object({ name: v.string() })),
-        thumbnail: v.optional(
-          v.object({
-            height: v.number(),
-            proxy_url: v.string(),
-            url: v.string(),
-            width: v.number(),
-          })
-        ),
-        title: v.optional(v.string()),
-        type: v.string(),
-        url: v.string(),
-      })
-    ),
+    embeds: v.array(v.any()),
     flags: v.number(),
     groupActivityApplicationId: v.null(),
     guildId: v.string(),
