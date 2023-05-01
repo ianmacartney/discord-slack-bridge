@@ -28,6 +28,10 @@ export const sendMessage = internalAction(
       const threadMsg = await web.chat.postMessage({
         text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
         channel,
+        // XXX Hack:
+        // Generic discord URL. Hopfully busts the slack cache
+        // so it doesn't say Webhook URL?
+        icon_url: "https://cdn.discordapp.com/embed/avatars/2.png",
         mrkdwn: true,
       });
       await runMutation("slack:startedThread", {
