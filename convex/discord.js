@@ -80,10 +80,12 @@ export const receiveMessage = mutation(
         channelName: dbChannel.name,
         threadTs: dbThread?.slackThreadTs,
         title: dbThread?.name,
-        emojis: dbThread?.appliedTags.map(
-          (tagId) =>
-            dbChannel.availableTags.find((t) => t.id === tagId)?.emoji.name
-        ),
+        emojis: dbThread?.appliedTags
+          .map(
+            (tagId) =>
+              dbChannel.availableTags.find((t) => t.id === tagId)?.emoji?.name
+          )
+          .filter((e) => e),
       });
     }
   }
