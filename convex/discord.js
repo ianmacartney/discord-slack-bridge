@@ -150,7 +150,7 @@ export const updateThread = mutation(
       .withIndex("id", (q) => q.eq("id", previous.id ?? thread.id))
       .unique();
     if (!existing) return;
-    await touchThread({ db }, { threadId });
+    await touchThread({ db }, { threadId: existing._id });
     await db.patch(existing._id, thread);
     const channel = await db.get(existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
