@@ -22,21 +22,33 @@ npx convex deploy
 To save the configuration in your repo, remove "convex.json" from .gitignore.
 Copy the deployment URL for later (it should end with ".convex.cloud").
 
-### 2. Discord Bot
+### 2. Configure Discord
 
-1. Create a bot and authorize it, adding it to your server / guild.
+1. Create a discord bot and authorize it, adding it to your server / guild.
 2. Copy the token and save it in the environment variables in the dashboard
    with the key TOKEN. `npx convex dashboard` to get there.
 
-### 3. Slack Bot
+### 3. Configure Slack
 
-1. Create a slack bot and install it into your workspace.
+1. Create a slack app and install it into your workspace.
 2. Copy the bot oauth token and save it in the convex environment variables as
    SLACK_TOKEN.
 
-### 4. discordBot.js on fly.io
+### 4. discordBot.js (on fly.io)
 
-Deploy the discordBot.js to fly.io:
+You can run the discordBot that connects to discord and sends changes to Convex
+locally to test, then deploy it to fly.io.
+
+**Locally:**
+
+```
+pnpm i
+export TOKEN=<discord-token>
+export CONVEX_URL=<deployment-URL>
+node discordBot.js
+```
+
+**Deploy the discordBot.js to fly.io:**
 
 1. Install flyctl, e.g. `brew install flyctl`
 2. Deploy it the first time with `fly launch`, then `fly deploy` after.
