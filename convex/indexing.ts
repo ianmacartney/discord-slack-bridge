@@ -7,12 +7,14 @@ import {
 } from "./_generated/server";
 
 const CONVEXER_ROLE = "1019375583387463710";
+const CONVEX_SERVER_ID = "1019350475847499849";
 
 export type DiscordDocument = {
   objectID: string;
   title: string;
   date: number;
   channel: string;
+  url: string;
   messages: {
     author: {
       name: string;
@@ -73,7 +75,8 @@ const hydrateSearchDocument = async ({
 
   return {
     title: thread.name,
-    objectID: thread.id,
+    objectID: `${chan.id}/${thread.id}`,
+    url: `https://discord.com/channels/${CONVEX_SERVER_ID}/${thread.id}`,
     channel: chan.name,
     tags,
     messages: finalMessages,
@@ -83,7 +86,7 @@ const hydrateSearchDocument = async ({
 
 type ChanInfo = Map<
   string,
-  { include: boolean; tagMap: Map<string, string>; name: string }
+  { include: boolean; id: string; tagMap: Map<string, string>; name: string }
 >;
 
 const getChanInfo = async ({
@@ -102,6 +105,7 @@ const getChanInfo = async ({
     tagMap.set(c._id.toString(), {
       tagMap: chanMap,
       name: c.name,
+      id: c.id,
       include: c.indexForSearch ?? false,
     });
   }
