@@ -72,7 +72,26 @@ export const interactivityHandler = httpAction(
     return new Response();
   }
 );
-
+export const checkForUnique = internalQuery(async ({ db }) => {
+  const seen = /* @__PURE__ */ new Set();
+  const messages = await db.query("messages").collect();
+  for (const message2 of messages) {
+    if (message2.slackTs && seen.has(message2.slackTs)) {
+      throw new Error(message2.slackTs);
+    }
+    seen.add(message2.slackTs);
+  }
+});
+export const checkThreadForUnique = internalQuery(async ({ db }) => {
+  const seenThread = /* @__PURE__ */ new Set();
+  const threads = await db.query("threads").collect();
+  for (const thread of threads) {
+    if (thread.slackThreadTs && seenThread.has(thread.slackThreadTs)) {
+      throw new Error(thread.slackThreadTs);
+    }
+    seenThread.add(thread.slackThreadTs);
+  }
+});
 export const getMessageByTs = internalQuery(async ({ db }, { messageTs }) => {
   let message = await db
     .query("messages")
