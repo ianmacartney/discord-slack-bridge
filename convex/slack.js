@@ -76,13 +76,13 @@ export const interactivityHandler = httpAction(
 export const getMessageByTs = internalQuery(async ({ db }, { messageTs }) => {
   let message = await db
     .query("messages")
-    .filter((q) => q.eq(q.field("slackTs"), messageTs))
+    .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
     .first();
   if (!message) {
     console.log("looking for thread");
     const thread = await db
       .query("threads")
-      .filter((q) => q.eq(q.field("slackThreadTs"), messageTs))
+      .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
       .first();
     if (thread) {
       console.log("looking for first message " + thread._id.id);
@@ -99,14 +99,14 @@ export const getMessageByTs = internalQuery(async ({ db }, { messageTs }) => {
 export const getChannelIdByTs = internalQuery(async ({ db }, { messageTs }) => {
   const thread = await db
     .query("threads")
-    .filter((q) => q.eq(q.field("slackThreadTs"), messageTs))
+    .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
     .first();
   if (thread) {
     return thread.id;
   }
   const message = await db
     .query("messages")
-    .filter((q) => q.eq(q.field("slackTs"), messageTs))
+    .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
     .first();
   if (message && message.threadId) {
     const thread = await db.get(message.threadId);

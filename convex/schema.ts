@@ -88,6 +88,7 @@ export default defineSchema({
     webhookId: v.null(),
   })
     .index("id", ["id"])
+    .index("slackTs", ["slackTs"])
     .index("threadId", ["threadId"]),
   threads: defineTable({
     appliedTags: v.array(v.string()),
@@ -116,6 +117,7 @@ export default defineSchema({
     version: v.optional(v.number()),
   })
     .index("id", ["id"])
+    .index("slackThreadTs", ["slackThreadTs"])
     .index("version", ["version"]),
   users: defineTable({
     avatar: v.union(v.null(), v.string()),
