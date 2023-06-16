@@ -107,7 +107,7 @@ export const getMessageByTs = internalQuery(async ({ db }, { messageTs }) => {
       console.log("looking for first message " + thread._id.id);
       message = await db
         .query("messages")
-        .filter((q) => q.eq(q.field("threadId"), thread._id))
+        .withIndex("threadId", (q) => q.eq("threadId", thread._id))
         .first();
     }
   }
