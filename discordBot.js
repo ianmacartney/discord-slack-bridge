@@ -101,7 +101,7 @@ bot.on("interactionCreate", async (interaction) => {
   }
 });
 
-const TOKEN = process.env.TOKEN;
-if (!TOKEN) throw "Need TOKEN env variable";
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+if (!DISCORD_TOKEN) throw "Need DISCORD_TOKEN env variable";
 
-await bot.login(TOKEN);
+await bot.login(DISCORD_TOKEN);

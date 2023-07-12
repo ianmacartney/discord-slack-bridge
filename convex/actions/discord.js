@@ -17,8 +17,8 @@ const discordClient = async () => {
       GatewayIntentBits.MessageContent,
     ],
   });
-  const token = process.env.TOKEN;
-  if (!token) throw new Error("Specify discord TOKEN in the dashboard");
+  const token = process.env.DISCORD_TOKEN;
+  if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
   await bot.login(token);
   return bot;
 };

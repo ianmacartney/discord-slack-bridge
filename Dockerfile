@@ -10,8 +10,8 @@ FROM node:16-alpine
 
 USER node
 WORKDIR /usr/src/app
-ARG TOKEN
-ENV TOKEN=${TOKEN}
+ARG DISCORD_TOKEN
+ENV DISCORD_TOKEN=${DISCORD_TOKEN}
 ARG CONVEX_URL="https://addicted-jackal-92.convex.cloud"
 ENV CONVEX_URL=${CONVEX_URL}
 COPY --chown=node:node ./discordBot.js ./discordBot.js

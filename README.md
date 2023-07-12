@@ -26,7 +26,7 @@ Copy the deployment URL for later (it should end with ".convex.cloud").
 
 1. Create a discord bot and authorize it, adding it to your server / guild.
 2. Copy the token and save it in the environment variables in the dashboard
-   with the key TOKEN. `npx convex dashboard` to get there.
+   with the key DISCORD_TOKEN. `npx convex dashboard` to get there.
 
 ### 3. Configure Slack
 
@@ -43,7 +43,7 @@ locally to test, then deploy it to fly.io.
 
 ```
 pnpm i
-export TOKEN=<discord-token>
+export DISCORD_TOKEN=<discord-token>
 export CONVEX_URL=<deployment-URL>
 node discordBot.js
 ```
@@ -54,7 +54,7 @@ node discordBot.js
 2. Deploy it the first time with `fly launch`, then `fly deploy` after.
 
 3. Set the environment variables for it with:
-   flyctl secrets set TOKEN=<discord-token>
+   flyctl secrets set DISCORD_TOKEN=<discord-token>
    flyctl secrets set CONVEX_URL=<deployment-URL>
 
 I just chose one instance in sjc, on the smallest (free) tier.
