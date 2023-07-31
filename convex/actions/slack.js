@@ -18,6 +18,7 @@ export const sendMessage = internalAction(
       text,
       channel,
       channelName,
+      linkUrl,
       threadTs,
       title,
       emojis,
@@ -26,7 +27,7 @@ export const sendMessage = internalAction(
     const web = slackClient();
     if (threadId && !threadTs && title) {
       const threadMsg = await web.chat.postMessage({
-        text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
+        text: threadMessage(title, channelName, linkUrl, emojis),
         channel,
         // XXX Hack:
         // Generic discord URL. Hopfully busts the slack cache
@@ -54,6 +55,12 @@ export const sendMessage = internalAction(
   }
 );
 
+function threadMessage(title, channelName, linkUrl, emojis) {
+  return `${title} (${channelName})\n${linkUrl ? linkUrl + " \n" : ""}${
+    emojis ? emojis.join(" ") : ""
+  }`;
+}
+
 export const updateMessage = internalAction(
   async ({}, { channel, messageTs, text, author }) => {
     const web = slackClient();
@@ -73,12 +80,12 @@ export const deleteMessage = internalAction(
 );
 
 export const updateThread = internalAction(
-  async ({}, { channel, threadTs, title, channelName, emojis }) => {
+  async ({}, { channel, threadTs, title, channelName, emojis, linkUrl }) => {
     const web = slackClient();
     await web.chat.update({
       channel,
       ts: threadTs,
-      text: `${title} (${channelName})\n${emojis ? emojis.join(" ") : ""}`,
+      text: threadMessage(title, channelName, linkUrl, emojis),
     });
   }
 );

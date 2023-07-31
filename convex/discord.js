@@ -82,6 +82,7 @@ export const receiveMessage = mutation(
         channelName: dbChannel.name,
         threadTs: dbThread?.slackThreadTs,
         title: dbThread?.name,
+        linkUrl: makeLinkUrl(dbThread),
         emojis: dbThread?.appliedTags
           .map(
             (tagId) =>
@@ -93,6 +94,12 @@ export const receiveMessage = mutation(
   }
 );
 
+function makeLinkUrl(dbThread) {
+  return dbThread
+    ? `https://discord.com/channels/${dbThread.guildId}/${dbThread.id}`
+    : undefined;
+}
+
 export const updateMessage = mutation(
   async ({ db, scheduler }, { previous, message }) => {
     const existing = await db
@@ -101,8 +108,10 @@ export const updateMessage = mutation(
       .unique();
     if (!existing) return;
     const { authorId, channelId, threadId } = existing;
+    let dbThread;
     if (threadId) {
       await touchThread({ db }, { threadId });
+      dbThread = await db.get(threadId);
     }
     // Overwrite authorId & channelId
     await db.patch(existing._id, { ...message, authorId, channelId });
@@ -113,6 +122,7 @@ export const updateMessage = mutation(
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent,
+        linkUrl: makeLinkUrl(dbThread),
         author: {
           name: author.displayName,
           username: author.username,
@@ -158,6 +168,7 @@ export const updateThread = mutation(
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
         title: thread.name,
+        linkUrl: makeLinkUrl(existing),
         channelName: channel.name,
         emojis: thread.appliedTags?.map(
           (tagId) =>
