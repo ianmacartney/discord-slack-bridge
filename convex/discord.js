@@ -69,7 +69,7 @@ export const receiveMessage = mutation(
       (message.type === 0 || message.type === 19) &&
       dbChannel.slackChannelId
     ) {
-      scheduler.runAfter(0, "actions/slack:sendMessage", {
+      await scheduler.runAfter(0, "actions/slack:sendMessage", {
         messageId,
         threadId,
         author: {
@@ -109,7 +109,7 @@ export const updateMessage = mutation(
     const channel = await db.get(channelId);
     const author = await db.get(authorId);
     if (channel.slackChannelId && existing.slackTs) {
-      scheduler.runAfter(0, "actions/slack:updateMessage", {
+      await scheduler.runAfter(0, "actions/slack:updateMessage", {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent,
@@ -136,7 +136,7 @@ export const deleteMessage = mutation(async ({ db, scheduler }, message) => {
   }
   const channel = await db.get(existing.channelId);
   if (channel.slackChannelId && existing.slackTs) {
-    scheduler.runAfter(0, "actions/slack:deleteMessage", {
+    await scheduler.runAfter(0, "actions/slack:deleteMessage", {
       messageTs: existing.slackTs,
       channel: channel.slackChannelId,
     });
@@ -154,7 +154,7 @@ export const updateThread = mutation(
     await db.patch(existing._id, thread);
     const channel = await db.get(existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      scheduler.runAfter(0, "actions/slack:updateThread", {
+      await scheduler.runAfter(0, "actions/slack:updateThread", {
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
         title: thread.name,
@@ -194,7 +194,7 @@ export const resolveThread = internalMutation(
       appliedTags: tags,
     });
     await touchThread({ db }, { threadId });
-    scheduler.runAfter(0, "actions/discord:applyTags", {
+    await scheduler.runAfter(0, "actions/discord:applyTags", {
       threadId: thread.id,
       tags,
     });
