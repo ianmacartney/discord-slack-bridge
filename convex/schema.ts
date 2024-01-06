@@ -1,15 +1,12 @@
 import { defineSchema, defineTable } from "convex/schema";
 import { v } from "convex/values";
+import { Table } from "./utils";
 
-export default defineSchema({
-  channels: defineTable({
+const Channels = Table("channels", {
     availableTags: v.optional(
       v.array(
         v.object({
-          emoji: v.union(
-            v.null(),
-            v.object({ id: v.null(), name: v.string() })
-          ),
+          emoji: v.union(v.null(), v.object({ id: v.null(), name: v.string() })),
           id: v.string(),
           moderated: v.boolean(),
           name: v.string(),
@@ -39,8 +36,9 @@ export default defineSchema({
     slackChannelId: v.optional(v.string()),
     topic: v.union(v.null(), v.string()),
     type: v.number(),
-  }).index("id", ["id"]),
-  messages: defineTable({
+});
+
+const Messages = Table("messages", {
     activity: v.null(),
     applicationId: v.null(),
     attachments: v.array(v.string()),
@@ -86,11 +84,9 @@ export default defineSchema({
     tts: v.boolean(),
     type: v.number(),
     webhookId: v.null(),
-  })
-    .index("id", ["id"])
-    .index("slackTs", ["slackTs"])
-    .index("threadId", ["threadId"]),
-  threads: defineTable({
+});
+
+const Threads = Table("threads", {
     appliedTags: v.array(v.string()),
     archiveTimestamp: v.number(),
     archived: v.boolean(),
@@ -115,11 +111,9 @@ export default defineSchema({
     totalMessageSent: v.number(),
     type: v.number(),
     version: v.optional(v.number()),
-  })
-    .index("id", ["id"])
-    .index("slackThreadTs", ["slackThreadTs"])
-    .index("version", ["version"]),
-  users: defineTable({
+});
+
+const Users = Table("users", {
     avatar: v.union(v.null(), v.string()),
     avatarURL: v.union(v.null(), v.string()),
     bot: v.boolean(),
@@ -141,7 +135,19 @@ export default defineSchema({
     tag: v.string(),
     userId: v.string(),
     username: v.string(),
-  }).index("id", ["id"]),
+});
+
+export default defineSchema({
+  channels: Channels.table.index("id", ["id"]),
+  messages: Messages.table
+    .index("id", ["id"])
+    .index("slackTs", ["slackTs"])
+    .index("threadId", ["threadId"]),
+  threads: Threads.table
+    .index("id", ["id"])
+    .index("slackThreadTs", ["slackThreadTs"])
+    .index("version", ["version"]),
+  users: Users.table.index("id", ["id"]),
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),
