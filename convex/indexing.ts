@@ -1,10 +1,5 @@
 import { Doc, Id } from "./_generated/dataModel";
-import {
-  DatabaseReader,
-  DatabaseWriter,
-  mutation,
-  query,
-} from "./_generated/server";
+import { DatabaseReader, DatabaseWriter, mutation, query } from "./_generated/server";
 
 const CONVEXER_ROLE = "1019375583387463710";
 

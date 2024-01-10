@@ -1,4 +1,5 @@
 "use node";
+import { api } from "../_generated/api";
 import { v } from "convex/values";
 import {
   serializeAuthor,
@@ -38,7 +39,7 @@ export const backfillDiscordChannel = internalAction({
       throw new Error("Only supporting backfilling forums for now");
     }
     await channel.guild.members.fetch();
-    const channelId = await runMutation("discord:addUniqueDoc", {
+    const channelId = await runMutation(api.discord.addUniqueDoc, {
       table: "channels",
       doc: serializeChannel(channel),
     });
@@ -47,7 +48,7 @@ export const backfillDiscordChannel = internalAction({
       if (thread.id !== discordId && thread.parentId !== discordId) {
         continue;
       }
-      const threadId = await runMutation("discord:addUniqueDoc", {
+      const threadId = await runMutation(api.discord.addUniqueDoc, {
         table: "threads",
         doc: {
           ...serializeThread(thread),
@@ -68,13 +69,13 @@ export const backfillDiscordChannel = internalAction({
           serializeAuthor(message),
           { ...serializeMessage(message), channelId, threadId },
         ]);
-        await runMutation("discord:addThreadBatch", {
+        await runMutation(api.discord.addThreadBatch, {
           authorsAndMessagesToAdd,
         });
       }
     }
     // Reset all versions as new for search indexing.
-    await runMutation("discord:forceRefreshVersions", {});
+    await runMutation(api.discord.forceRefreshVersions, {});
   },
 });
 

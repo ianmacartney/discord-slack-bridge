@@ -18,6 +18,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["./**/*", "../shared/discordUtils.js"],
+  "include": ["./**/*"],
   "exclude": ["./_generated"]
 }

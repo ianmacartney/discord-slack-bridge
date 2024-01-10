@@ -1,4 +1,4 @@
-import { defineSchema, defineTable } from "convex/schema";
+import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { Table } from "./utils";
 
@@ -14,7 +14,7 @@ export const Channels = Table("channels", {
     )
   ),
   createdTimestamp: v.number(),
-  defaultAutoArchiveDuration: v.optional(v.null()),
+  defaultAutoArchiveDuration: v.optional(v.union(v.number(), v.null())),
   defaultForumLayout: v.optional(v.number()),
   defaultReactionEmoji: v.optional(
     v.object({ id: v.null(), name: v.string() })

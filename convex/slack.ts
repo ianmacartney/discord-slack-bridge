@@ -1,3 +1,4 @@
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import {
   httpAction,
@@ -20,10 +21,12 @@ export const interactivityHandler = httpAction(
       const messageTs = body.view.private_metadata;
       const reply = body.view.state.values.input.reply.value;
       const slackUserId = body.user.id;
-      const channelId = await runQuery("slack:getChannelIdByTs", { messageTs });
-      const user = await runQuery("slack:getUserBySlackId", { slackUserId });
+      const channelId = await runQuery(api.slack.getChannelIdByTs, {
+        messageTs,
+      });
+      const user = await runQuery(api.slack.getUserBySlackId, { slackUserId });
       if (channelId && user) {
-        await runAction("actions/discord:replyFromSlack", {
+        await runAction(api.actions.discord.replyFromSlack, {
           channelId,
           userId: user._id,
           reply,
@@ -48,9 +51,9 @@ export const interactivityHandler = httpAction(
       // older callback ID
       case "support_resolve":
       case "resolve":
-        const message = await runQuery("slack:getMessageByTs", { messageTs });
+        const message = await runQuery(api.slack.getMessageByTs, { messageTs });
         if (message?.threadId) {
-          await runMutation("discord:resolveThread", {
+          await runMutation(api.discord.resolveThread, {
             threadId: message.threadId,
           });
         } else {
@@ -63,7 +66,7 @@ export const interactivityHandler = httpAction(
         const slackUserId = body.user.id;
         const triggerId = body.trigger_id;
         console.log({ slackUserId, triggerId, messageTs });
-        await runAction("actions/slack:initiateReply", {
+        await runAction(api.actions.slack.initiateReply, {
           slackUserId,
           triggerId,
           messageTs,
@@ -113,7 +116,7 @@ export const getMessageByTs = internalQuery({
         .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
         .first();
       if (thread) {
-        console.log("looking for first message " + thread._id.id);
+        console.log("looking for first message " + thread._id);
         message = await db
           .query("messages")
           .withIndex("threadId", (q) => q.eq("threadId", thread._id))

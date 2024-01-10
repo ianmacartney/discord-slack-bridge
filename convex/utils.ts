@@ -1,4 +1,4 @@
-import { defineTable } from "convex/schema";
+import { defineTable } from "convex/server";
 import { GenericId, Validator, v } from "convex/values";
 
 /**
