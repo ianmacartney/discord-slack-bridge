@@ -85,6 +85,13 @@ export const Messages = Table("messages", {
   type: v.number(),
   webhookId: v.null(),
 });
+const {
+  authorId: _,
+  channelId: __,
+  threadId: ___,
+  ...MessageWithoutIds
+} = Messages.withoutSystemFields;
+export { MessageWithoutIds };
 
 export const Threads = Table("threads", {
   appliedTags: v.array(v.string()),
@@ -112,6 +119,9 @@ export const Threads = Table("threads", {
   type: v.number(),
   version: v.optional(v.number()),
 });
+const { channelId: ____, ...ThreadWithoutChannelId } =
+  Threads.withoutSystemFields;
+export { ThreadWithoutChannelId };
 
 export const Users = Table("users", {
   avatar: v.union(v.null(), v.string()),

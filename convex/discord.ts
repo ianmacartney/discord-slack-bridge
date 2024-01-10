@@ -6,9 +6,13 @@ import {
   DatabaseWriter,
   MutationCtx,
 } from "./_generated/server";
-import { Channels, Messages, Threads, Users } from "./schema";
+import {
+  Channels,
+  Users,
+  MessageWithoutIds,
+  ThreadWithoutChannelId,
+} from "./schema";
 import { v } from "convex/values";
-import { Channel, ThreadChannel } from "discord.js";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -85,21 +89,12 @@ export const addThreadBatch = internalMutation(
   }
 );
 
-const {
-  authorId: _,
-  channelId: __,
-  threadId: ___,
-  ...MessageWithoutIds
-} = Messages.withoutSystemFields;
-const { channelId: ____, ...threadWithoutChannelId } =
-  Threads.withoutSystemFields;
-
 export const receiveMessage = mutation({
   args: {
     author: v.object(Users.withoutSystemFields),
     message: v.object(MessageWithoutIds),
     channel: v.object(Channels.withoutSystemFields),
-    thread: v.object(threadWithoutChannelId),
+    thread: v.object(ThreadWithoutChannelId),
   },
   handler: async ({ db, scheduler }, { author, message, channel, thread }) => {
     const authorId = await getOrCreate(db, "users", author);
@@ -223,8 +218,8 @@ export const deleteMessage = mutation({
 
 export const updateThread = mutation({
   args: {
-    previous: v.object(threadWithoutChannelId),
-    thread: v.object(threadWithoutChannelId),
+    previous: v.object(ThreadWithoutChannelId),
+    thread: v.object(ThreadWithoutChannelId),
   },
   handler: async ({ db, scheduler }, { previous, thread }) => {
     const existing = await db
