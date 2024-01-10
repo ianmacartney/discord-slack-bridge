@@ -45,7 +45,16 @@ locally to test, then deploy it to fly.io.
 pnpm i
 export DISCORD_TOKEN=<discord-token>
 export CONVEX_URL=<deployment-URL>
-node discordBot.js
+npm run clean && npm run build
+node dist/discordBot.js
+```
+
+**In Docker:**
+
+```
+npm run clean && npm run build
+docker build . -t discordbot:latest
+docker run --init --env-file .env --rm discordbot:latest
 ```
 
 **Deploy the discordBot.js to fly.io:**
