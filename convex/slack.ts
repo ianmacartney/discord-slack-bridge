@@ -1,4 +1,4 @@
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import {
   httpAction,
@@ -21,12 +21,14 @@ export const interactivityHandler = httpAction(
       const messageTs = body.view.private_metadata;
       const reply = body.view.state.values.input.reply.value;
       const slackUserId = body.user.id;
-      const channelId = await runQuery(api.slack.getChannelIdByTs, {
+      const channelId = await runQuery(internal.slack.getChannelIdByTs, {
         messageTs,
       });
-      const user = await runQuery(api.slack.getUserBySlackId, { slackUserId });
+      const user = await runQuery(internal.slack.getUserBySlackId, {
+        slackUserId,
+      });
       if (channelId && user) {
-        await runAction(api.actions.discord.replyFromSlack, {
+        await runAction(internal.actions.discord.replyFromSlack, {
           channelId,
           userId: user._id,
           reply,
@@ -51,9 +53,11 @@ export const interactivityHandler = httpAction(
       // older callback ID
       case "support_resolve":
       case "resolve":
-        const message = await runQuery(api.slack.getMessageByTs, { messageTs });
+        const message = await runQuery(internal.slack.getMessageByTs, {
+          messageTs,
+        });
         if (message?.threadId) {
-          await runMutation(api.discord.resolveThread, {
+          await runMutation(internal.discord.resolveThread, {
             threadId: message.threadId,
           });
         } else {
@@ -66,7 +70,7 @@ export const interactivityHandler = httpAction(
         const slackUserId = body.user.id;
         const triggerId = body.trigger_id;
         console.log({ slackUserId, triggerId, messageTs });
-        await runAction(api.actions.slack.initiateReply, {
+        await runAction(internal.actions.slack.initiateReply, {
           slackUserId,
           triggerId,
           messageTs,

@@ -1,4 +1,4 @@
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { WithoutSystemFields } from "convex/server";
 import { Doc, Id } from "./_generated/dataModel";
 import {
@@ -120,7 +120,7 @@ export const receiveMessage = mutation({
       (message.type === 0 || message.type === 19) &&
       dbChannel.slackChannelId
     ) {
-      scheduler.runAfter(0, api.actions.slack.sendMessage, {
+      scheduler.runAfter(0, internal.actions.slack.sendMessage, {
         messageId,
         threadId,
         author: {
@@ -179,7 +179,7 @@ export const updateMessage = mutation({
       throw new Error("Channel or author not found:" + channelId + authorId);
     }
     if (channel.slackChannelId && existing.slackTs) {
-      scheduler.runAfter(0, api.actions.slack.updateMessage, {
+      scheduler.runAfter(0, internal.actions.slack.updateMessage, {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent,
@@ -209,7 +209,7 @@ export const deleteMessage = mutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackTs) {
-      scheduler.runAfter(0, api.actions.slack.deleteMessage, {
+      scheduler.runAfter(0, internal.actions.slack.deleteMessage, {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
       });
@@ -233,7 +233,7 @@ export const updateThread = mutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      scheduler.runAfter(0, api.actions.slack.updateThread, {
+      scheduler.runAfter(0, internal.actions.slack.updateThread, {
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
         title: thread.name,
@@ -281,7 +281,7 @@ export const resolveThread = internalMutation({
       appliedTags: tags,
     });
     await touchThread({ db }, { threadId });
-    scheduler.runAfter(0, api.actions.discord.applyTags, {
+    scheduler.runAfter(0, internal.actions.discord.applyTags, {
       threadId: thread.id,
       tags,
     });
