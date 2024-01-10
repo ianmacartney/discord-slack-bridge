@@ -1,10 +1,4 @@
-import {
-  Channel,
-  Message,
-  PartialMessage,
-  ThreadChannel,
-  flatten,
-} from "discord.js";
+import { Channel, Message, PartialMessage, ThreadChannel } from "discord.js";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -51,7 +45,6 @@ export function serializeMessage(msg: Message): DiscordMessage {
     content: msg.content,
     createdTimestamp: msg.createdTimestamp,
     editedTimestamp: msg.editedTimestamp,
-    embeds: msg.embeds,
     flags: msg.flags.valueOf(),
     id: msg.id,
     pinned: msg.pinned,
@@ -68,7 +61,6 @@ export function serializePartialMessage(msg: Message | PartialMessage) {
     content: msg.content ?? undefined,
     createdTimestamp: msg.createdTimestamp,
     editedTimestamp: msg.editedTimestamp,
-    embeds: msg.embeds,
     flags: msg.flags.valueOf(),
     id: msg.id,
     pinned: msg.pinned ?? undefined,
@@ -106,6 +98,6 @@ export function serializeAuthor(msg: Message): DiscordUser {
     nickname: msg.member?.nickname ?? null, // 'Ian',
     pending: msg.member?.pending, // false,
     displayName: msg.member?.displayName, // 'Ian',
-    roles: (flatten(msg.member?.roles) as string[]) ?? [], // [ '1019375583387463710', '1019350475847499849' ],
+    roles: Array.from(msg.member?.roles.valueOf().keys() ?? []), // [ '1019375583387463710', '1019350475847499849' ],
   };
 }

@@ -67,11 +67,9 @@ export const interactivityHandler = httpAction(
       // older callback ID
       case "support_reply":
       case "reply":
-        const slackUserId = body.user.id;
         const triggerId = body.trigger_id;
-        console.log({ slackUserId, triggerId, messageTs });
+        console.log({ triggerId, messageTs });
         await runAction(internal.actions.slack.initiateReply, {
-          slackUserId,
           triggerId,
           messageTs,
           message: body.message.text,
@@ -179,7 +177,7 @@ export const getUserBySlackId = internalQuery({
 });
 
 // TODO: validate it came from slack
-export const slashHandler = httpAction(async ({ runMutation }, request) => {
+export const slashHandler = httpAction(async (_ctx, request) => {
   console.log(request);
   return new Response();
 });

@@ -9,8 +9,7 @@ import {
 } from "../../shared/discordUtils";
 import { internalAction } from "../_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
-import { WithoutSystemFields } from "convex/server";
-import { Doc, Id } from "../_generated/dataModel";
+import { Id } from "../_generated/dataModel";
 import { DiscordMessage, DiscordUser } from "../schema";
 
 const discordClient = async () => {
@@ -105,7 +104,7 @@ export const applyTags = internalAction({
     threadId: v.string(),
     tags: v.array(v.string()),
   },
-  handler: async (ctx, { threadId, tags }) => {
+  handler: async (_ctx, { threadId, tags }) => {
     const bot = await discordClient();
     const thread = await bot.channels.fetch(threadId);
     if (!thread) {

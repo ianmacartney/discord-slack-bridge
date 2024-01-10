@@ -138,12 +138,11 @@ export const updateThread = internalAction({
 
 export const initiateReply = internalAction({
   args: {
-    slackUserId: v.string(),
     triggerId: v.string(),
     messageTs: v.string(),
     message: v.string(),
   },
-  handler: async ({}, { slackUserId, triggerId, messageTs, message }) => {
+  handler: async ({}, { triggerId, messageTs, message }) => {
     const web = slackClient();
     const resp = await web.views.open({
       trigger_id: triggerId,
