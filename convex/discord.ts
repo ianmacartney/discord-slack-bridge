@@ -8,10 +8,10 @@ import {
   MutationCtx,
 } from "./_generated/server";
 import {
-  Channels,
-  Users,
-  MessageWithoutIds,
-  ThreadWithoutChannelId,
+  DiscordThread,
+  DiscordMessage,
+  DiscordUser,
+  DiscordChannel,
 } from "./schema";
 import { v } from "convex/values";
 
@@ -76,26 +76,32 @@ export const addThreadBatch = internalMutation(
     { db },
     {
       authorsAndMessagesToAdd,
+      threadId,
+      channelId,
     }: {
-      authorsAndMessagesToAdd: [
-        WithoutSystemFields<Doc<"users">>,
-        WithoutSystemFields<Doc<"messages">>
-      ][];
+      authorsAndMessagesToAdd: [DiscordUser, DiscordMessage][];
+      threadId: Id<"threads">;
+      channelId: Id<"channels">;
     }
   ) => {
     for (const [author, message] of authorsAndMessagesToAdd) {
       const authorId = await getOrCreate(db, "users", author);
-      await getOrCreate(db, "messages", { ...message, authorId });
+      await getOrCreate(db, "messages", {
+        ...message,
+        authorId,
+        threadId,
+        channelId,
+      });
     }
   }
 );
 
 export const receiveMessage = mutation({
   args: {
-    author: v.object(Users.withoutSystemFields),
-    message: v.object(MessageWithoutIds),
-    channel: v.object(Channels.withoutSystemFields),
-    thread: v.object(ThreadWithoutChannelId),
+    author: v.object(DiscordUser),
+    message: v.object(DiscordMessage),
+    channel: v.object(DiscordChannel),
+    thread: v.optional(v.object(DiscordThread)),
   },
   handler: async ({ db, scheduler }, { author, message, channel, thread }) => {
     const authorId = await getOrCreate(db, "users", author);
@@ -123,11 +129,7 @@ export const receiveMessage = mutation({
       scheduler.runAfter(0, internal.actions.slack.sendMessage, {
         messageId,
         threadId,
-        author: {
-          name: author.displayName,
-          username: author.username,
-          avatarUrl: author.displayAvatarURL || (author.avatarURL ?? undefined),
-        },
+        author: slackAuthor(author),
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         channelName: dbChannel.name,
@@ -152,14 +154,17 @@ function makeLinkUrl(dbThread: Doc<"threads"> | undefined) {
 }
 
 export const updateMessage = mutation({
-  args: {
-    previous: v.object(MessageWithoutIds),
-    message: v.object(MessageWithoutIds),
-  },
-  handler: async ({ db, scheduler }, { previous, message }) => {
+  // TODO: turn on validation after rollout & `partial` implementation
+  // args: {
+  //   message: v.object(partial(DiscordMessage))),
+  // },
+  handler: async (
+    { db, scheduler },
+    { message }: { message: Partial<DiscordMessage> & { id: string } }
+  ) => {
     const existing = await db
       .query("messages")
-      .withIndex("id", (q) => q.eq("id", previous.id ?? message.id))
+      .withIndex("id", (q) => q.eq("id", message.id))
       .unique();
     if (!existing) return;
     const { authorId, channelId, threadId } = existing;
@@ -182,23 +187,25 @@ export const updateMessage = mutation({
       scheduler.runAfter(0, internal.actions.slack.updateMessage, {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
-        text: message.cleanContent,
-        author: {
-          name: author.displayName,
-          username: author.username,
-          avatarUrl: (author.displayAvatarURL || author.avatarURL) ?? undefined,
-        },
+        text: message.cleanContent ?? existing.cleanContent,
+        author: slackAuthor(author),
       });
     }
   },
 });
 
+const slackAuthor = (author: DiscordUser) => ({
+  name: author.displayName ?? author.nickname ?? author.username,
+  username: author.username,
+  avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
+});
+
 export const deleteMessage = mutation({
-  args: MessageWithoutIds,
-  handler: async ({ db, scheduler }, message) => {
+  // args: MessageWithoutIds, // TODO; turn on validation after rollout
+  handler: async ({ db, scheduler }, { id }: { id: string }) => {
     const existing = await db
       .query("messages")
-      .withIndex("id", (q) => q.eq("id", message.id))
+      .withIndex("id", (q) => q.eq("id", id))
       .unique();
     if (!existing) return;
     await db.patch(existing._id, { deleted: true });
@@ -219,8 +226,8 @@ export const deleteMessage = mutation({
 
 export const updateThread = mutation({
   args: {
-    previous: v.object(ThreadWithoutChannelId),
-    thread: v.object(ThreadWithoutChannelId),
+    previous: v.object(DiscordThread),
+    thread: v.object(DiscordThread),
   },
   handler: async ({ db, scheduler }, { previous, thread }) => {
     const existing = await db

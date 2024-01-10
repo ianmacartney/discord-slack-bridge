@@ -1,150 +1,157 @@
 import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+import { ObjectType, Validator, v } from "convex/values";
 import { Table } from "./utils";
 
-export const Channels = Table("channels", {
+// Utility validators
+const deprecated = v.optional(v.any());
+const nullable = <T extends Validator<any, any, any>>(validator: T) =>
+  v.union(v.null(), validator);
+
+export const DiscordChannel = {
   availableTags: v.optional(
     v.array(
       v.object({
-        emoji: v.union(v.null(), v.object({ id: v.null(), name: v.string() })),
+        emoji: nullable(
+          v.object({ id: nullable(v.string()), name: nullable(v.string()) })
+        ),
         id: v.string(),
         moderated: v.boolean(),
         name: v.string(),
       })
     )
   ),
-  createdTimestamp: v.number(),
-  defaultAutoArchiveDuration: v.optional(v.union(v.number(), v.null())),
-  defaultForumLayout: v.optional(v.number()),
-  defaultReactionEmoji: v.optional(
-    v.object({ id: v.null(), name: v.string() })
-  ),
-  defaultSortOrder: v.optional(v.null()),
-  defaultThreadRateLimitPerUser: v.optional(v.null()),
-  flags: v.number(),
-  guild: v.string(),
-  guildId: v.string(),
+  createdTimestamp: nullable(v.number()),
+  flags: v.optional(v.number()),
   id: v.string(),
-  indexForSearch: v.optional(v.boolean()),
-  lastMessageId: v.optional(v.string()),
   name: v.string(),
-  nsfw: v.boolean(),
-  parentId: v.string(),
-  permissionOverwrites: v.array(v.string()),
-  rateLimitPerUser: v.optional(v.number()),
-  rawPosition: v.number(),
-  slackChannelId: v.optional(v.string()),
-  topic: v.union(v.null(), v.string()),
+  parentId: nullable(v.string()),
+  topic: nullable(v.string()),
   type: v.number(),
+};
+export type DiscordChannel = ObjectType<typeof DiscordChannel>;
+export const Channels = Table("channels", {
+  slackChannelId: v.optional(v.string()),
+  indexForSearch: v.optional(v.boolean()),
+  ...DiscordChannel,
+  // Legacy fields
+  defaultAutoArchiveDuration: deprecated,
+  defaultForumLayout: deprecated,
+  defaultReactionEmoji: deprecated,
+  defaultSortOrder: deprecated,
+  defaultThreadRateLimitPerUser: deprecated,
+  guild: deprecated,
+  guildId: deprecated,
+  lastMessageId: deprecated,
+  nsfw: deprecated,
+  permissionOverwrites: deprecated,
+  rateLimitPerUser: deprecated,
+  rawPosition: deprecated,
 });
 
-export const Messages = Table("messages", {
-  activity: v.null(),
-  applicationId: v.null(),
-  attachments: v.array(v.string()),
-  authorId: v.id("users"),
-  channelId: v.id("channels"),
+export const DiscordMessage = {
   cleanContent: v.string(),
-  components: v.array(v.any()),
   content: v.string(),
   createdTimestamp: v.number(),
-  deleted: v.optional(v.boolean()),
-  editedTimestamp: v.union(v.null(), v.number()),
+  editedTimestamp: nullable(v.number()),
   embeds: v.array(v.any()),
   flags: v.number(),
-  groupActivityApplicationId: v.null(),
-  guildId: v.string(),
   id: v.string(),
-  interaction: v.null(),
-  mentions: v.object({
-    channels: v.array(v.string()),
-    crosspostedChannels: v.array(v.any()),
-    everyone: v.boolean(),
-    members: v.array(v.string()),
-    repliedUser: v.union(v.null(), v.string()),
-    roles: v.array(v.any()),
-    users: v.array(v.string()),
-  }),
-  nonce: v.union(v.null(), v.string()),
   pinned: v.boolean(),
-  position: v.union(v.null(), v.number()),
-  reference: v.union(
-    v.null(),
+  reference: nullable(
     v.object({
       channelId: v.string(),
-      guildId: v.string(),
+      guildId: v.optional(v.string()),
       messageId: v.optional(v.string()),
     })
   ),
-  roleSubscriptionData: v.null(),
-  slackTs: v.optional(v.string()),
-  stickers: v.array(v.any()),
   system: v.boolean(),
-  threadId: v.optional(v.id("threads")),
-  tts: v.boolean(),
   type: v.number(),
-  webhookId: v.null(),
-});
-const {
-  authorId: _,
-  channelId: __,
-  threadId: ___,
-  ...MessageWithoutIds
-} = Messages.withoutSystemFields;
-export { MessageWithoutIds };
-
-export const Threads = Table("threads", {
-  appliedTags: v.array(v.string()),
-  archiveTimestamp: v.number(),
-  archived: v.boolean(),
-  autoArchiveDuration: v.number(),
+  json: v.optional(v.any()),
+};
+export type DiscordMessage = ObjectType<typeof DiscordMessage>;
+export const Messages = Table("messages", {
+  authorId: v.id("users"),
   channelId: v.id("channels"),
+  deleted: v.optional(v.boolean()),
+  threadId: v.optional(v.id("threads")),
+  slackTs: v.optional(v.string()),
+  ...DiscordMessage,
+  // Legacy fields
+  activity: deprecated,
+  applicationId: deprecated,
+  attachments: deprecated,
+  components: deprecated,
+  interaction: deprecated,
+  guildId: deprecated,
+  groupActivityApplicationId: deprecated,
+  mentions: deprecated,
+  nonce: deprecated,
+  position: deprecated,
+  roleSubscriptionData: deprecated,
+  stickers: deprecated,
+  tts: deprecated,
+  webhookId: deprecated,
+});
+
+export const DiscordThread = {
+  appliedTags: v.array(v.string()),
+  archiveTimestamp: nullable(v.number()),
+  archived: nullable(v.boolean()),
   createdTimestamp: v.number(),
   flags: v.number(),
-  guild: v.string(),
-  guildId: v.string(),
   id: v.string(),
-  invitable: v.null(),
-  lastMessageId: v.string(),
-  lastPinTimestamp: v.null(),
-  locked: v.boolean(),
-  memberCount: v.number(),
-  messageCount: v.number(),
+  invitable: nullable(v.boolean()),
+  locked: nullable(v.boolean()),
   name: v.string(),
-  ownerId: v.string(),
-  parentId: v.string(),
-  rateLimitPerUser: v.number(),
-  slackThreadTs: v.optional(v.string()),
-  totalMessageSent: v.number(),
+  ownerId: nullable(v.string()),
+  parentId: nullable(v.string()),
   type: v.number(),
+};
+export type DiscordThread = ObjectType<typeof DiscordThread>;
+export const Threads = Table("threads", {
+  channelId: v.id("channels"),
+  slackThreadTs: v.optional(v.string()),
   version: v.optional(v.number()),
+  ...DiscordThread,
+  // Legacy fields
+  autoArchiveDuration: deprecated,
+  guild: deprecated,
+  guildId: deprecated,
+  lastMessageId: deprecated,
+  lastPinTimestamp: deprecated,
+  memberCount: deprecated,
+  messageCount: deprecated,
+  rateLimitPerUser: deprecated,
+  totalMessageSent: deprecated,
 });
-const { channelId: ____, ...ThreadWithoutChannelId } =
-  Threads.withoutSystemFields;
-export { ThreadWithoutChannelId };
 
-export const Users = Table("users", {
-  avatar: v.union(v.null(), v.string()),
-  avatarURL: v.union(v.null(), v.string()),
+export const DiscordUser = {
+  avatarURL: nullable(v.string()),
   bot: v.boolean(),
   createdTimestamp: v.number(),
-  defaultAvatarURL: v.string(),
-  discriminator: v.string(),
-  displayAvatarURL: v.string(),
-  displayName: v.string(),
+  discriminator: v.string(), // '8678' e.g.
+  displayAvatarURL: nullable(v.string()),
+  displayName: v.optional(v.string()),
   flags: v.number(),
-  guildId: v.string(),
   id: v.string(),
-  joinedTimestamp: v.number(),
-  memberId: v.string(),
-  nickname: v.union(v.null(), v.string()),
-  pending: v.boolean(),
+  joinedTimestamp: nullable(v.number()),
+  memberId: v.optional(v.string()),
+  nickname: nullable(v.string()),
+  pending: v.optional(v.boolean()),
   roles: v.array(v.string()),
-  slackUserId: v.optional(v.string()),
   system: v.boolean(),
   tag: v.string(),
-  userId: v.string(),
   username: v.string(),
+};
+export type DiscordUser = ObjectType<typeof DiscordUser>;
+export const Users = Table("users", {
+  slackUserId: v.optional(v.string()),
+  ...DiscordUser,
+  // Legacy fields
+  avatar: deprecated,
+  defaultAvatarURL: deprecated,
+  guildId: deprecated,
+  userId: deprecated,
 });
 
 export default defineSchema({

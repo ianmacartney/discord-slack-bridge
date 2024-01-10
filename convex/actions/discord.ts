@@ -10,7 +10,8 @@ import {
 import { internalAction } from "../_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 import { WithoutSystemFields } from "convex/server";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
+import { DiscordMessage, DiscordUser } from "../schema";
 
 const discordClient = async () => {
   const bot = new Client({
@@ -39,27 +40,24 @@ export const backfillDiscordChannel = internalAction({
       throw new Error("Only supporting backfilling forums for now");
     }
     await channel.guild.members.fetch();
-    const channelId = await runMutation(internal.discord.addUniqueDoc, {
+    const channelId = (await runMutation(internal.discord.addUniqueDoc, {
       table: "channels",
       doc: serializeChannel(channel),
-    });
+    })) as Id<"channels">;
     const { threads } = await channel.threads.fetchActive();
     for (const [, thread] of threads.entries()) {
       if (thread.id !== discordId && thread.parentId !== discordId) {
         continue;
       }
-      const threadId = await runMutation(internal.discord.addUniqueDoc, {
+      const threadId = (await runMutation(internal.discord.addUniqueDoc, {
         table: "threads",
         doc: {
           ...serializeThread(thread),
           channelId,
         },
-      });
+      })) as Id<"threads">;
       const messages = await thread.messages.fetch();
-      const authorsAndMessagesToAdd: [
-        WithoutSystemFields<Doc<"users">>,
-        WithoutSystemFields<Doc<"messages">>
-      ][] = [];
+      const authorsAndMessagesToAdd: [DiscordUser, DiscordMessage][] = [];
       for (const [, message] of messages) {
         if (!message.member) {
           console.log(message);
@@ -67,10 +65,12 @@ export const backfillDiscordChannel = internalAction({
         }
         authorsAndMessagesToAdd.push([
           serializeAuthor(message),
-          { ...serializeMessage(message), channelId, threadId },
+          serializeMessage(message),
         ]);
         await runMutation(internal.discord.addThreadBatch, {
           authorsAndMessagesToAdd,
+          channelId,
+          threadId,
         });
       }
     }

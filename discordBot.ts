@@ -5,6 +5,7 @@ import {
   serializeAuthor,
   serializeChannel,
   serializeMessage,
+  serializePartialMessage,
   serializeThread,
 } from "./shared/discordUtils.js";
 
@@ -23,15 +24,15 @@ const bot = new Client({
 });
 
 bot.on("ready", () => {
-  console.log(`Logged in as ${bot.user.tag}!`);
+  console.log(`Logged in as ${bot.user?.tag}!`);
 });
 
 bot.on("messageCreate", async (msg) => {
   let channel, thread;
   if (
-    msg.channel.type === ChannelType.GuildForum ||
-    msg.channel.type === ChannelType.PublicThread ||
-    msg.channel.type === ChannelType.PrivateThread
+    (msg.channel.type === ChannelType.PublicThread ||
+      msg.channel.type === ChannelType.PrivateThread) &&
+    msg.channel.parent
   ) {
     thread = serializeThread(msg.channel);
     channel = serializeChannel(msg.channel.parent);
@@ -59,10 +60,9 @@ bot.on("messageCreate", async (msg) => {
   }
 });
 
-bot.on("messageUpdate", async (oldMsg, newMsg) => {
+bot.on("messageUpdate", async (_oldMsg, newMsg) => {
   const args = {
-    previous: serializeMessage(oldMsg),
-    message: serializeMessage(newMsg),
+    message: serializePartialMessage(newMsg),
   };
   console.log("update message " + newMsg.id);
   try {
@@ -75,7 +75,7 @@ bot.on("messageUpdate", async (oldMsg, newMsg) => {
 bot.on("messageDelete", async (msg) => {
   console.log("delete message " + msg.id);
   try {
-    await convex.mutation(api.discord.deleteMessage, msg.toJSON());
+    await convex.mutation(api.discord.deleteMessage, { id: msg.id });
   } catch (e) {
     console.error(e);
   }
@@ -105,4 +105,4 @@ bot.on("interactionCreate", async (interaction) => {
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 if (!DISCORD_TOKEN) throw "Need DISCORD_TOKEN env variable";
 
-await bot.login(DISCORD_TOKEN);
+bot.login(DISCORD_TOKEN);

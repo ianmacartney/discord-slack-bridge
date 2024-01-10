@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
+    "build": "tsc",
+    "clean": "rm -rf dist",
     "discord": "node discordBot.js"
   },
   "dependencies": {
