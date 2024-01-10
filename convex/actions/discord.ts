@@ -35,7 +35,10 @@ export const backfillDiscordChannel = internalAction({
     if (!channel) {
       throw new Error(`Channel ${discordId} not found`);
     }
-    if (channel.type !== ChannelType.GuildForum) {
+    if (
+      channel.type !== ChannelType.GuildForum &&
+      channel.type !== ChannelType.GuildText
+    ) {
       throw new Error("Only supporting backfilling forums for now");
     }
     await channel.guild.members.fetch();
