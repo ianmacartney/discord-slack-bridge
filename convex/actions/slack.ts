@@ -1,6 +1,8 @@
 "use node";
 import { internalAction } from "../_generated/server";
 import { WebClient } from "@slack/web-api";
+import { v } from "convex/values";
+import { Users } from "../schema";
 
 const slackClient = () => {
   const token = process.env.SLACK_TOKEN;
@@ -8,8 +10,26 @@ const slackClient = () => {
   return new WebClient(token);
 };
 
-export const sendMessage = internalAction(
-  async (
+const author = v.object({
+  name: v.string(),
+  username: v.string(),
+  avatarUrl: v.optional(v.string()),
+});
+
+export const sendMessage = internalAction({
+  args: {
+    messageId: v.id("messages"),
+    threadId: v.optional(v.id("threads")),
+    author,
+    text: v.string(),
+    channel: v.string(),
+    channelName: v.string(),
+    linkUrl: v.optional(v.string()),
+    threadTs: v.optional(v.string()),
+    title: v.optional(v.string()),
+    emojis: v.optional(v.array(v.string())),
+  },
+  handler: async (
     { runMutation },
     {
       messageId,
@@ -37,7 +57,7 @@ export const sendMessage = internalAction(
       });
       await runMutation("slack:startedThread", {
         threadId,
-        threadTs: threadMsg.ts,
+        threadTs: threadMsg.ts!,
       });
       threadTs = threadMsg.ts;
     }
@@ -50,48 +70,80 @@ export const sendMessage = internalAction(
     });
     await runMutation("slack:sentMessage", {
       messageId,
-      messageTs: result.ts,
+      messageTs: result.ts!,
     });
-  }
-);
+  },
+});
 
-function threadMessage(title, channelName, linkUrl, emojis) {
+function threadMessage(
+  title: string,
+  channelName: string,
+  linkUrl?: string,
+  emojis?: string[]
+) {
   return `${title} (${channelName})\n${linkUrl ? linkUrl + " \n" : ""}${
     emojis ? emojis.join(" ") : ""
   }`;
 }
 
-export const updateMessage = internalAction(
-  async ({}, { channel, messageTs, text, author }) => {
+export const updateMessage = internalAction({
+  args: {
+    channel: v.string(),
+    messageTs: v.string(),
+    text: v.string(),
+    author,
+  },
+  handler: async ({}, { channel, messageTs, text, author }) => {
     const web = slackClient();
     await web.chat.update({
       channel,
       ts: messageTs,
       text: `*${author.name ?? author.username}*: ${text}`,
     });
-  }
-);
+  },
+});
 
-export const deleteMessage = internalAction(
-  async ({}, { channel, messageTs }) => {
+export const deleteMessage = internalAction({
+  args: {
+    channel: v.string(),
+    messageTs: v.string(),
+  },
+  handler: async ({}, { channel, messageTs }) => {
     const web = slackClient();
     await web.chat.delete({ channel, ts: messageTs });
-  }
-);
+  },
+});
 
-export const updateThread = internalAction(
-  async ({}, { channel, threadTs, title, channelName, emojis, linkUrl }) => {
+export const updateThread = internalAction({
+  args: {
+    channel: v.string(),
+    threadTs: v.string(),
+    title: v.string(),
+    channelName: v.string(),
+    emojis: v.optional(v.array(v.string())),
+    linkUrl: v.optional(v.string()),
+  },
+  handler: async (
+    {},
+    { channel, threadTs, title, channelName, emojis, linkUrl }
+  ) => {
     const web = slackClient();
     await web.chat.update({
       channel,
       ts: threadTs,
       text: threadMessage(title, channelName, linkUrl, emojis),
     });
-  }
-);
+  },
+});
 
-export const initiateReply = internalAction(
-  async ({}, { slackUserId, triggerId, messageTs, message }) => {
+export const initiateReply = internalAction({
+  args: {
+    slackUserId: v.string(),
+    triggerId: v.string(),
+    messageTs: v.string(),
+    message: v.string(),
+  },
+  handler: async ({}, { slackUserId, triggerId, messageTs, message }) => {
     const web = slackClient();
     const resp = await web.views.open({
       trigger_id: triggerId,
@@ -118,7 +170,7 @@ export const initiateReply = internalAction(
             type: "section",
             text: {
               type: "mrkdwn",
-              text: message.text,
+              text: message,
             },
           },
           {
@@ -141,5 +193,5 @@ export const initiateReply = internalAction(
       },
     });
     console.log({ success: resp.ok });
-  }
-);
+  },
+});

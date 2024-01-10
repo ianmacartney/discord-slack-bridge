@@ -1,4 +1,5 @@
 "use node";
+import { v } from "convex/values";
 import {
   serializeAuthor,
   serializeChannel,
@@ -7,6 +8,8 @@ import {
 } from "../../shared/discordUtils";
 import { internalAction } from "../_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
+import { WithoutSystemFields } from "convex/server";
+import { Doc } from "../_generated/dataModel";
 
 const discordClient = async () => {
   const bot = new Client({
@@ -23,14 +26,18 @@ const discordClient = async () => {
   return bot;
 };
 
-export const backfillDiscordChannel = internalAction(
-  async ({ runMutation }, { discordId }) => {
+export const backfillDiscordChannel = internalAction({
+  args: { discordId: v.string() },
+  handler: async ({ runMutation }, { discordId }) => {
     const bot = await discordClient();
     const channel = await bot.channels.fetch(discordId);
-    await channel.guild.members.fetch();
-    if (channel.type !== ChannelType.GuildForum) {
-      throw new Error("Only support backfilling forums for now");
+    if (!channel) {
+      throw new Error(`Channel ${discordId} not found`);
     }
+    if (channel.type !== ChannelType.GuildForum) {
+      throw new Error("Only supporting backfilling forums for now");
+    }
+    await channel.guild.members.fetch();
     const channelId = await runMutation("discord:addUniqueDoc", {
       table: "channels",
       doc: serializeChannel(channel),
@@ -48,7 +55,10 @@ export const backfillDiscordChannel = internalAction(
         },
       });
       const messages = await thread.messages.fetch();
-      const authorsAndMessagesToAdd = [];
+      const authorsAndMessagesToAdd: [
+        WithoutSystemFields<Doc<"users">>,
+        WithoutSystemFields<Doc<"messages">>
+      ][] = [];
       for (const [, message] of messages) {
         if (!message.member) {
           console.log(message);
@@ -65,21 +75,44 @@ export const backfillDiscordChannel = internalAction(
     }
     // Reset all versions as new for search indexing.
     await runMutation("discord:forceRefreshVersions", {});
-  }
-);
+  },
+});
 
-export const replyFromSlack = internalAction(
-  async ({}, { channelId, user, reply }) => {
-    console.log(channelId, user.id, reply);
+export const replyFromSlack = internalAction({
+  args: {
+    channelId: v.string(),
+    userId: v.id("users"),
+    reply: v.string(),
+  },
+  handler: async ({}, { channelId, userId, reply }) => {
+    console.log(channelId, userId, reply);
     const bot = await discordClient();
     const channel = await bot.channels.fetch(channelId);
+    if (!channel) {
+      throw new Error(`Channel ${channelId} not found`);
+    }
+    if (!("send" in channel)) {
+      throw new Error("Cannot reply to categories");
+    }
 
-    await channel.send(`<@${user.id}>: ${reply}`);
-  }
-);
+    await channel.send(`<@${userId}>: ${reply}`);
+  },
+});
 
-export const applyTags = internalAction(async ({}, { threadId, tags }) => {
-  const bot = await discordClient();
-  const thread = await bot.channels.fetch(threadId);
-  await thread.setAppliedTags(tags);
+export const applyTags = internalAction({
+  args: {
+    threadId: v.string(),
+    tags: v.array(v.string()),
+  },
+  handler: async (ctx, { threadId, tags }) => {
+    const bot = await discordClient();
+    const thread = await bot.channels.fetch(threadId);
+    if (!thread) {
+      throw new Error(`Thread ${threadId} not found`);
+    }
+    if (thread.type !== ChannelType.PublicThread) {
+      throw new Error("Can only set tags on threads");
+    }
+    await thread.setAppliedTags(tags);
+  },
 });

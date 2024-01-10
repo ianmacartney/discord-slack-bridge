@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from "convex/schema";
 import { v } from "convex/values";
 import { Table } from "./utils";
 
-const Channels = Table("channels", {
+export const Channels = Table("channels", {
   availableTags: v.optional(
     v.array(
       v.object({
@@ -38,7 +38,7 @@ const Channels = Table("channels", {
   type: v.number(),
 });
 
-const Messages = Table("messages", {
+export const Messages = Table("messages", {
   activity: v.null(),
   applicationId: v.null(),
   attachments: v.array(v.string()),
@@ -86,7 +86,7 @@ const Messages = Table("messages", {
   webhookId: v.null(),
 });
 
-const Threads = Table("threads", {
+export const Threads = Table("threads", {
   appliedTags: v.array(v.string()),
   archiveTimestamp: v.number(),
   archived: v.boolean(),

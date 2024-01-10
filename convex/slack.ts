@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import {
   httpAction,
   internalMutation,
@@ -8,7 +9,11 @@ import {
 export const interactivityHandler = httpAction(
   async ({ runMutation, runAction, runQuery }, request) => {
     const bodyParams = new URLSearchParams(await request.text());
-    const body = JSON.parse(bodyParams.get("payload"));
+    const payload = bodyParams.get("payload");
+    if (!payload) {
+      return new Response("ok");
+    }
+    const body = JSON.parse(payload);
 
     // "shortcut" is global shortcuts
     if (body.type === "view_submission") {
@@ -20,13 +25,13 @@ export const interactivityHandler = httpAction(
       if (channelId && user) {
         await runAction("actions/discord:replyFromSlack", {
           channelId,
-          user,
+          userId: user._id,
           reply,
         });
       } else {
         console.log({
           error: "not found",
-          message,
+          reply,
           user,
           slackUserId,
           messageTs,
@@ -62,7 +67,7 @@ export const interactivityHandler = httpAction(
           slackUserId,
           triggerId,
           messageTs,
-          message: body.message,
+          message: body.message.text,
         });
         break;
       default:
@@ -92,60 +97,79 @@ export const checkThreadForUnique = internalQuery(async ({ db }) => {
     seenThread.add(thread.slackThreadTs);
   }
 });
-export const getMessageByTs = internalQuery(async ({ db }, { messageTs }) => {
-  let message = await db
-    .query("messages")
-    .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
-    .first();
-  if (!message) {
-    console.log("looking for thread");
+export const getMessageByTs = internalQuery({
+  args: {
+    messageTs: v.string(),
+  },
+  handler: async ({ db }, { messageTs }) => {
+    let message = await db
+      .query("messages")
+      .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
+      .first();
+    if (!message) {
+      console.log("looking for thread");
+      const thread = await db
+        .query("threads")
+        .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
+        .first();
+      if (thread) {
+        console.log("looking for first message " + thread._id.id);
+        message = await db
+          .query("messages")
+          .withIndex("threadId", (q) => q.eq("threadId", thread._id))
+          .first();
+      }
+    }
+    return message;
+  },
+});
+
+// Important: this is the Discord channel.id, not the Doc<"channels">._id
+export const getChannelIdByTs = internalQuery({
+  args: {
+    messageTs: v.string(),
+  },
+  handler: async ({ db }, { messageTs }) => {
     const thread = await db
       .query("threads")
       .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
       .first();
     if (thread) {
-      console.log("looking for first message " + thread._id.id);
-      message = await db
-        .query("messages")
-        .withIndex("threadId", (q) => q.eq("threadId", thread._id))
-        .first();
+      return thread.id;
     }
-  }
-  return message;
+    const message = await db
+      .query("messages")
+      .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
+      .first();
+    if (message && message.threadId) {
+      const thread = await db.get(message.threadId);
+      if (!thread) {
+        throw new Error("Thread not found");
+      }
+      return thread.id;
+    }
+    if (message && message.channelId) {
+      const channel = await db.get(message.channelId);
+      if (!channel) {
+        throw new Error("Channel not found");
+      }
+      return channel.id;
+    }
+    return null;
+  },
 });
 
-// Important: this is the Discord channel.id, not the Doc<"channels">._id
-export const getChannelIdByTs = internalQuery(async ({ db }, { messageTs }) => {
-  const thread = await db
-    .query("threads")
-    .withIndex("slackThreadTs", (q) => q.eq("slackThreadTs", messageTs))
-    .first();
-  if (thread) {
-    return thread.id;
-  }
-  const message = await db
-    .query("messages")
-    .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
-    .first();
-  if (message && message.threadId) {
-    const thread = await db.get(message.threadId);
-    return thread.id;
-  }
-  if (message && message.channelId) {
-    const channel = await db.get(message.channelId);
-    return channel.id;
-  }
-  return null;
-});
-
-export const getUserBySlackId = internalQuery(
-  async ({ db }, { slackUserId }) => {
+export const getUserBySlackId = internalQuery({
+  args: {
+    slackUserId: v.string(),
+  },
+  handler: async ({ db }, { slackUserId }) => {
     return await db
       .query("users")
       .filter((q) => q.eq(q.field("slackUserId"), slackUserId))
       .first();
-  }
-);
+  },
+});
 
 // TODO: validate it came from slack
 export const slashHandler = httpAction(async ({ runMutation }, request) => {
@@ -153,13 +177,22 @@ export const slashHandler = httpAction(async ({ runMutation }, request) => {
   return new Response();
 });
 
-export const startedThread = internalMutation(
-  async ({ db }, { threadId, threadTs }) => {
+export const startedThread = internalMutation({
+  args: {
+    threadId: v.id("threads"),
+    threadTs: v.string(),
+  },
+  handler: async ({ db }, { threadId, threadTs }) => {
     await db.patch(threadId, { slackThreadTs: threadTs });
-  }
-);
-export const sentMessage = internalMutation(
-  async ({ db }, { messageId, messageTs }) => {
+  },
+});
+
+export const sentMessage = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    messageTs: v.string(),
+  },
+  handler: async ({ db }, { messageId, messageTs }) => {
     await db.patch(messageId, { slackTs: messageTs });
-  }
-);
+  },
+});
