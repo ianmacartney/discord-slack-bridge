@@ -297,10 +297,9 @@ export const resolveThread = internalMutation({
 });
 
 export const registerAccountHandler = httpAction(
-  async ({ runAction }, request) => {
+  async ({ runAction, runMutation }, request) => {
     authorizeWebhookRequest(request);
     const { memberId, discordId } = JSON.parse(await request.text());
-    console.log({ memberId, discordId });
 
     // Add the role
     const guildId = process.env.DISCORD_GUILD_ID;
@@ -315,19 +314,20 @@ export const registerAccountHandler = httpAction(
       roleId,
     });
 
-    // @TODO Update user
+    await runMutation(internal.discord.insertRegistration, {
+      discordUserId: discordId,
+      associatedAccountId: memberId,
+    });
 
     return new Response();
   }
 );
 
 export const unregisterAccountHandler = httpAction(
-  async ({ runAction }, request) => {
+  async ({ runAction, runMutation }, request) => {
     authorizeWebhookRequest(request);
-    const { memberId, discordId } = JSON.parse(await request.text());
-    console.log({ memberId, discordId });
+    const { discordId } = JSON.parse(await request.text());
 
-    // Remove the role
     const guildId = process.env.DISCORD_GUILD_ID;
     if (!guildId) throw new Error(`Guild ID not configured`);
 
@@ -340,7 +340,9 @@ export const unregisterAccountHandler = httpAction(
       roleId,
     });
 
-    // @TODO Update user
+    await runMutation(internal.discord.deleteRegistration, {
+      discordUserId: discordId,
+    });
 
     return new Response();
   }
@@ -354,5 +356,35 @@ function authorizeWebhookRequest(request: Request) {
 
   if (request.headers.get("Authorization") !== `Bearer ${webhookToken}`) {
     throw new Error("Token for webhook requests invalid");
+  }
+}
+
+export const insertRegistration = internalMutation({
+  args: {
+    discordUserId: v.string(),
+    associatedAccountId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId, associatedAccountId }) => {
+    await deleteRegistrations(db, discordUserId);
+    await db.insert("registrations", { discordUserId, associatedAccountId });
+  },
+});
+
+export const deleteRegistration = internalMutation({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId }) => {
+    await deleteRegistrations(db, discordUserId);
+  },
+});
+
+async function deleteRegistrations(db: DatabaseWriter, discordUserId: string) {
+  const existingRows = await db
+    .query("registrations")
+    .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
+    .collect();
+  for (const { _id } of existingRows) {
+    await db.delete(_id);
   }
 }
