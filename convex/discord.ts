@@ -7,6 +7,7 @@ import {
   DatabaseWriter,
   MutationCtx,
   httpAction,
+  DatabaseReader,
 } from "./_generated/server";
 import {
   DiscordThread,
@@ -130,7 +131,7 @@ export const receiveMessage = mutation({
       await scheduler.runAfter(0, internal.actions.slack.sendMessage, {
         messageId,
         threadId,
-        author: slackAuthor(author),
+        author: await slackAuthor(db, author),
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         channelName: dbChannel.name,
@@ -189,17 +190,24 @@ export const updateMessage = mutation({
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent ?? existing.cleanContent,
-        author: slackAuthor(author),
+        author: await slackAuthor(db, author),
       });
     }
   },
 });
 
-const slackAuthor = (author: DiscordUser) => ({
-  name: author.displayName ?? author.nickname ?? author.username,
-  username: author.username,
-  avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
-});
+const slackAuthor = async (db: DatabaseReader, author: DiscordUser) => {
+  const registration = await db
+    .query("registrations")
+    .withIndex("discordUserId", (q) => q.eq("discordUserId", author.id))
+    .first();
+  return {
+    name: author.displayName ?? author.nickname ?? author.username,
+    username: author.username,
+    avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
+    associatedAccountId: registration?.associatedAccountId ?? null,
+  };
+};
 
 export const deleteMessage = mutation({
   // args: MessageWithoutIds, // TODO; turn on validation after rollout
@@ -299,7 +307,7 @@ export const resolveThread = internalMutation({
 export const registerAccountHandler = httpAction(
   async ({ runAction, runMutation }, request) => {
     authorizeWebhookRequest(request);
-    const { memberId, discordId } = JSON.parse(await request.text());
+    const { associatedAccountId, discordId } = JSON.parse(await request.text());
 
     // Add the role
     const guildId = process.env.DISCORD_GUILD_ID;
@@ -316,7 +324,7 @@ export const registerAccountHandler = httpAction(
 
     await runMutation(internal.discord.insertRegistration, {
       discordUserId: discordId,
-      associatedAccountId: memberId,
+      associatedAccountId,
     });
 
     return new Response();
