@@ -408,7 +408,7 @@ export const isAccountLinked = internalQuery({
       .query("registrations")
       .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
       .first();
-    return discordUserId !== null;
+    return registration !== null;
   },
 });
 
@@ -428,7 +428,7 @@ export const addRoleIfAccountLinked = action({
     });
 
     if (isAccountLinked) {
-      runAction(internal.actions.discord.addRole, {
+      await runAction(internal.actions.discord.addRole, {
         guildId,
         discordUserId,
         roleId,
