@@ -119,3 +119,41 @@ export const applyTags = internalAction({
     await thread.setAppliedTags(tags);
   },
 });
+
+export const addRole = internalAction({
+  args: {
+    discordUserId: v.string(),
+    guildId: v.string(),
+    roleId: v.string(),
+  },
+  handler: async (_ctx, { discordUserId, guildId, roleId }) => {
+    const bot = await discordClient();
+
+    const guild = await bot.guilds.fetch(guildId);
+    if (!guild) throw new Error(`Can’t find guild ${guildId}`);
+
+    const member = await guild.members.fetch(discordUserId);
+    if (member) {
+      await member.roles.add(roleId);
+    }
+  },
+});
+
+export const removeRole = internalAction({
+  args: {
+    discordUserId: v.string(),
+    guildId: v.string(),
+    roleId: v.string(),
+  },
+  handler: async (_ctx, { discordUserId, guildId, roleId }) => {
+    const bot = await discordClient();
+
+    const guild = await bot.guilds.fetch(guildId);
+    if (!guild) throw new Error(`Can’t find guild ${guildId}`);
+
+    const member = await guild.members.fetch(discordUserId);
+    if (member) {
+      await member.roles.remove(roleId);
+    }
+  },
+});

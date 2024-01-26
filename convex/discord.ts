@@ -6,6 +6,7 @@ import {
   internalMutation,
   DatabaseWriter,
   MutationCtx,
+  httpAction,
 } from "./_generated/server";
 import {
   DiscordThread,
@@ -294,3 +295,64 @@ export const resolveThread = internalMutation({
     });
   },
 });
+
+export const registerAccountHandler = httpAction(
+  async ({ runAction }, request) => {
+    authorizeWebhookRequest(request);
+    const { memberId, discordId } = JSON.parse(await request.text());
+    console.log({ memberId, discordId });
+
+    // Add the role
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    await runAction(internal.actions.discord.addRole, {
+      discordUserId: discordId,
+      guildId,
+      roleId,
+    });
+
+    // @TODO Update user
+
+    return new Response();
+  }
+);
+
+export const unregisterAccountHandler = httpAction(
+  async ({ runAction }, request) => {
+    authorizeWebhookRequest(request);
+    const { memberId, discordId } = JSON.parse(await request.text());
+    console.log({ memberId, discordId });
+
+    // Remove the role
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    await runAction(internal.actions.discord.removeRole, {
+      discordUserId: discordId,
+      guildId,
+      roleId,
+    });
+
+    // @TODO Update user
+
+    return new Response();
+  }
+);
+
+function authorizeWebhookRequest(request: Request) {
+  const webhookToken = process.env.WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    throw new Error("Token for webhook requests not set");
+  }
+
+  if (request.headers.get("Authorization") !== `Bearer ${webhookToken}`) {
+    throw new Error("Token for webhook requests invalid");
+  }
+}
