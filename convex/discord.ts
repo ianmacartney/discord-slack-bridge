@@ -8,6 +8,8 @@ import {
   MutationCtx,
   httpAction,
   DatabaseReader,
+  action,
+  internalQuery,
 } from "./_generated/server";
 import {
   DiscordThread,
@@ -396,3 +398,41 @@ async function deleteRegistrations(db: DatabaseWriter, discordUserId: string) {
     await db.delete(_id);
   }
 }
+
+export const isAccountLinked = internalQuery({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId }) => {
+    const registration = await db
+      .query("registrations")
+      .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
+      .first();
+    return discordUserId !== null;
+  },
+});
+
+export const addRoleIfAccountLinked = action({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ runQuery, runAction }, { discordUserId }) => {
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    const isAccountLinked = await runQuery(internal.discord.isAccountLinked, {
+      discordUserId,
+    });
+
+    if (isAccountLinked) {
+      runAction(internal.actions.discord.addRole, {
+        guildId,
+        discordUserId,
+        roleId,
+      });
+    }
+  },
+});
