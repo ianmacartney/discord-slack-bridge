@@ -2,7 +2,7 @@
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 import { WebClient } from "@slack/web-api";
-import { v } from "convex/values";
+import { ObjectType, v } from "convex/values";
 
 const slackClient = () => {
   const token = process.env.SLACK_TOKEN;
@@ -10,17 +10,18 @@ const slackClient = () => {
   return new WebClient(token);
 };
 
-const author = v.object({
+const authorValidator = {
   name: v.string(),
   username: v.string(),
   avatarUrl: v.optional(v.string()),
-});
+  associatedAccountId: v.union(v.string(), v.null()),
+};
 
 export const sendMessage = internalAction({
   args: {
     messageId: v.id("messages"),
     threadId: v.optional(v.id("threads")),
-    author,
+    author: v.object(authorValidator),
     text: v.string(),
     channel: v.string(),
     channelName: v.string(),
@@ -62,7 +63,7 @@ export const sendMessage = internalAction({
       threadTs = threadMsg.ts;
     }
     const result = await web.chat.postMessage({
-      text: `*${author.name ?? author.username}*: ${text}`,
+      text: `${formatAuthor(author)}: ${text}`,
       channel,
       icon_url: author.avatarUrl,
       thread_ts: threadTs,
@@ -86,19 +87,25 @@ function threadMessage(
   }`;
 }
 
+function formatAuthor(author: ObjectType<typeof authorValidator>) {
+  return `*${author.name ?? author.username}*${
+    author.associatedAccountId ? ` (:aid: ${author.associatedAccountId})` : ""
+  }`;
+}
+
 export const updateMessage = internalAction({
   args: {
     channel: v.string(),
     messageTs: v.string(),
     text: v.string(),
-    author,
+    author: v.object(authorValidator),
   },
   handler: async ({}, { channel, messageTs, text, author }) => {
     const web = slackClient();
     await web.chat.update({
       channel,
       ts: messageTs,
-      text: `*${author.name ?? author.username}*: ${text}`,
+      text: `${formatAuthor(author)}: ${text}`,
     });
   },
 });

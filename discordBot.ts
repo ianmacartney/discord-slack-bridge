@@ -102,6 +102,16 @@ bot.on("interactionCreate", async (interaction) => {
   }
 });
 
+bot.on("guildMemberAdd", async (member) => {
+  try {
+    await convex.action(api.discord.addRoleIfAccountLinked, {
+      discordUserId: member.id,
+    });
+  } catch (e) {
+    console.error(e);
+  }
+});
+
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 if (!DISCORD_TOKEN) throw "Need DISCORD_TOKEN env variable";
 

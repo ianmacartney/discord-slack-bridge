@@ -154,6 +154,11 @@ export const Users = Table("users", {
   userId: deprecated,
 });
 
+export const Registrations = Table("registrations", {
+  discordUserId: v.string(),
+  associatedAccountId: v.string(),
+});
+
 export default defineSchema({
   channels: Channels.table.index("id", ["id"]),
   messages: Messages.table
@@ -165,6 +170,7 @@ export default defineSchema({
     .index("slackThreadTs", ["slackThreadTs"])
     .index("version", ["version"]),
   users: Users.table.index("id", ["id"]),
+  registrations: Registrations.table.index("discordUserId", ["discordUserId"]),
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),

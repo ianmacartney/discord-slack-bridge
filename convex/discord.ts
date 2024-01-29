@@ -6,6 +6,10 @@ import {
   internalMutation,
   DatabaseWriter,
   MutationCtx,
+  httpAction,
+  DatabaseReader,
+  action,
+  internalQuery,
 } from "./_generated/server";
 import {
   DiscordThread,
@@ -129,7 +133,7 @@ export const receiveMessage = mutation({
       await scheduler.runAfter(0, internal.actions.slack.sendMessage, {
         messageId,
         threadId,
-        author: slackAuthor(author),
+        author: await slackAuthor(db, author),
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         channelName: dbChannel.name,
@@ -188,17 +192,24 @@ export const updateMessage = mutation({
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent ?? existing.cleanContent,
-        author: slackAuthor(author),
+        author: await slackAuthor(db, author),
       });
     }
   },
 });
 
-const slackAuthor = (author: DiscordUser) => ({
-  name: author.displayName ?? author.nickname ?? author.username,
-  username: author.username,
-  avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
-});
+const slackAuthor = async (db: DatabaseReader, author: DiscordUser) => {
+  const registration = await db
+    .query("registrations")
+    .withIndex("discordUserId", (q) => q.eq("discordUserId", author.id))
+    .first();
+  return {
+    name: author.displayName ?? author.nickname ?? author.username,
+    username: author.username,
+    avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
+    associatedAccountId: registration?.associatedAccountId ?? null,
+  };
+};
 
 export const deleteMessage = mutation({
   // args: MessageWithoutIds, // TODO; turn on validation after rollout
@@ -292,5 +303,136 @@ export const resolveThread = internalMutation({
       threadId: thread.id,
       tags,
     });
+  },
+});
+
+export const registerAccountHandler = httpAction(
+  async ({ runAction, runMutation }, request) => {
+    authorizeWebhookRequest(request);
+    const { associatedAccountId, discordId } = JSON.parse(await request.text());
+
+    // Add the role
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    await runAction(internal.actions.discord.addRole, {
+      discordUserId: discordId,
+      guildId,
+      roleId,
+    });
+
+    await runMutation(internal.discord.insertRegistration, {
+      discordUserId: discordId,
+      associatedAccountId,
+    });
+
+    return new Response();
+  }
+);
+
+export const unregisterAccountHandler = httpAction(
+  async ({ runAction, runMutation }, request) => {
+    authorizeWebhookRequest(request);
+    const { discordId } = JSON.parse(await request.text());
+
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    await runAction(internal.actions.discord.removeRole, {
+      discordUserId: discordId,
+      guildId,
+      roleId,
+    });
+
+    await runMutation(internal.discord.deleteRegistration, {
+      discordUserId: discordId,
+    });
+
+    return new Response();
+  }
+);
+
+function authorizeWebhookRequest(request: Request) {
+  const webhookToken = process.env.WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    throw new Error("Token for webhook requests not set");
+  }
+
+  if (request.headers.get("Authorization") !== `Bearer ${webhookToken}`) {
+    throw new Error("Token for webhook requests invalid");
+  }
+}
+
+export const insertRegistration = internalMutation({
+  args: {
+    discordUserId: v.string(),
+    associatedAccountId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId, associatedAccountId }) => {
+    await deleteRegistrations(db, discordUserId);
+    await db.insert("registrations", { discordUserId, associatedAccountId });
+  },
+});
+
+export const deleteRegistration = internalMutation({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId }) => {
+    await deleteRegistrations(db, discordUserId);
+  },
+});
+
+async function deleteRegistrations(db: DatabaseWriter, discordUserId: string) {
+  const existingRows = await db
+    .query("registrations")
+    .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
+    .collect();
+  for (const { _id } of existingRows) {
+    await db.delete(_id);
+  }
+}
+
+export const isAccountLinked = internalQuery({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ db }, { discordUserId }) => {
+    const registration = await db
+      .query("registrations")
+      .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
+      .first();
+    return registration !== null;
+  },
+});
+
+export const addRoleIfAccountLinked = action({
+  args: {
+    discordUserId: v.string(),
+  },
+  handler: async ({ runQuery, runAction }, { discordUserId }) => {
+    const guildId = process.env.DISCORD_GUILD_ID;
+    if (!guildId) throw new Error(`Guild ID not configured`);
+
+    const roleId = process.env.DISCORD_VERIFIED_ROLE_ID;
+    if (!roleId) throw new Error(`Verified role ID not configured`);
+
+    const isAccountLinked = await runQuery(internal.discord.isAccountLinked, {
+      discordUserId,
+    });
+
+    if (isAccountLinked) {
+      await runAction(internal.actions.discord.addRole, {
+        guildId,
+        discordUserId,
+        roleId,
+      });
+    }
   },
 });
