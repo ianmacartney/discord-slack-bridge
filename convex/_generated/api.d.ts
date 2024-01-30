@@ -15,6 +15,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as algolia from "../algolia.js";
+import type * as apiFunctions from "../apiFunctions.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
 import type * as discord_node from "../discord_node.js";
@@ -36,6 +37,7 @@ import type * as verification_node from "../verification_node.js";
  */
 declare const fullApi: ApiFromModules<{
   algolia: typeof algolia;
+  apiFunctions: typeof apiFunctions;
   crons: typeof crons;
   discord: typeof discord;
   discord_node: typeof discord_node;

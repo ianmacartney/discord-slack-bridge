@@ -14,6 +14,9 @@ dependencies:
   convex:
     specifier: ^1.7.1
     version: 1.7.1
+  convex-helpers:
+    specifier: ^0.1.14
+    version: 0.1.14(convex@1.7.1)
   discord.js:
     specifier: ^14.9.0
     version: 14.9.0
@@ -480,6 +483,21 @@ packages:
     engines: {node: '>= 0.8'}
     dependencies:
       delayed-stream: 1.0.0
+    dev: false
+
+  /convex-helpers@0.1.14(convex@1.7.1):
+    resolution: {integrity: sha512-vMoDQDpyU/OBrHfX75IZC9czxMUSyz6RWKPRd7IglmkRxWM+D3Nqbp3iNoyuhu3YDS+q249TKzXBCS/0J9Te+A==}
+    peerDependencies:
+      convex: ^1.7.1
+      react: ^17.0.2 || ^18.0.0
+      zod: ^3.22.4
+    peerDependenciesMeta:
+      react:
+        optional: true
+      zod:
+        optional: true
+    dependencies:
+      convex: 1.7.1
     dev: false
 
   /convex@1.7.1:

@@ -15,6 +15,7 @@ import {
   DiscordChannel,
 } from "./schema";
 import { v } from "convex/values";
+import { apiMutation } from "./apiFunctions";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -97,7 +98,7 @@ export const addThreadBatch = internalMutation(
   }
 );
 
-export const receiveMessage = mutation({
+export const receiveMessage = apiMutation({
   args: {
     author: v.object(DiscordUser),
     message: v.object(DiscordMessage),
@@ -161,8 +162,15 @@ export const updateMessage = mutation({
   // },
   handler: async (
     { db, scheduler },
-    { message }: { message: Partial<DiscordMessage> & { id: string } }
+    {
+      message,
+      apiToken,
+    }: { message: Partial<DiscordMessage> & { id: string }; apiToken: string }
   ) => {
+    if (apiToken !== process.env.CONVEX_API_TOKEN) {
+      // TODO: just use apiMutation once we have arg validation here.
+      throw new Error("Invalid API token");
+    }
     const existing = await db
       .query("messages")
       .withIndex("id", (q) => q.eq("id", message.id))
@@ -208,8 +216,8 @@ const slackAuthor = async (db: DatabaseReader, author: DiscordUser) => {
   };
 };
 
-export const deleteMessage = mutation({
-  // args: MessageWithoutIds, // TODO; turn on validation after rollout
+export const deleteMessage = apiMutation({
+  args: { id: v.string() },
   handler: async ({ db, scheduler }, { id }: { id: string }) => {
     const existing = await db
       .query("messages")
@@ -232,7 +240,7 @@ export const deleteMessage = mutation({
   },
 });
 
-export const updateThread = mutation({
+export const updateThread = apiMutation({
   args: {
     previous: v.object(DiscordThread),
     thread: v.object(DiscordThread),

@@ -19,9 +19,6 @@ npx convex init
 npx convex deploy
 ```
 
-To save the configuration in your repo, remove "convex.json" from .gitignore.
-Copy the deployment URL for later (it should end with ".convex.cloud").
-
 ### 2. Configure Discord
 
 1. Create a discord bot and authorize it, adding it to your server / guild.
@@ -44,7 +41,8 @@ locally to test, then deploy it to fly.io.
 ```
 pnpm i
 export DISCORD_TOKEN=<discord-token>
-export CONVEX_URL=<deployment-URL>
+export CONVEX_URL=<deployment-URL-from-.env.local>
+export CONVEX_API_TOKEN=<some-shared-secret>
 npm run discordBot
 ```
 
@@ -64,6 +62,7 @@ npm run clean && npm run build
 3. Set the environment variables for it with:
    flyctl secrets set DISCORD_TOKEN=<discord-token>
    flyctl secrets set CONVEX_URL=<deployment-URL>
+   flyctl secrets set CONVEX_API_TOKEN=<shared-token>
 
 I just chose one instance in sjc, on the smallest (free) tier.
 I did have to enter my CC info, but it hasn't been charged.

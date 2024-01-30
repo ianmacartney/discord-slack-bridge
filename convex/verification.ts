@@ -3,10 +3,10 @@ import {
   internalMutation,
   DatabaseWriter,
   httpAction,
-  action,
   internalQuery,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { apiAction } from "./apiFunctions";
 
 export const registerAccountHandler = httpAction(async (ctx, request) => {
   authorizeWebhookRequest(request);
@@ -97,7 +97,7 @@ export const isAccountLinked = internalQuery({
   },
 });
 
-export const addRoleIfAccountLinked = action({
+export const addRoleIfAccountLinked = apiAction({
   args: {
     discordUserId: v.string(),
   },

@@ -9,6 +9,9 @@ import {
   serializeThread,
 } from "./shared/discordUtils.js";
 
+const apiToken = process.env.CONVEX_API_TOKEN;
+if (!apiToken) throw new Error("Specify CONVEX_API_TOKEN as an env variable");
+
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");
 console.log(`Server address: ${deploymentUrl}`);
@@ -46,6 +49,7 @@ bot.on("messageCreate", async (msg) => {
     message: serializeMessage(msg),
     channel,
     thread,
+    apiToken,
   };
   console.log(
     `${args.author.username}: ${args.message.cleanContent} (${
@@ -63,6 +67,7 @@ bot.on("messageCreate", async (msg) => {
 bot.on("messageUpdate", async (_oldMsg, newMsg) => {
   const args = {
     message: serializePartialMessage(newMsg),
+    apiToken,
   };
   console.log("update message " + newMsg.id);
   try {
@@ -75,7 +80,7 @@ bot.on("messageUpdate", async (_oldMsg, newMsg) => {
 bot.on("messageDelete", async (msg) => {
   console.log("delete message " + msg.id);
   try {
-    await convex.mutation(api.discord.deleteMessage, { id: msg.id });
+    await convex.mutation(api.discord.deleteMessage, { id: msg.id, apiToken });
   } catch (e) {
     console.error(e);
   }
@@ -85,6 +90,7 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
   const args = {
     previous: serializeThread(oldThread),
     thread: serializeThread(newThread),
+    apiToken,
   };
   console.log("update thread " + newThread.id);
   try {
@@ -106,6 +112,7 @@ bot.on("guildMemberAdd", async (member) => {
   try {
     await convex.action(api.verification.addRoleIfAccountLinked, {
       discordUserId: member.id,
+      apiToken,
     });
   } catch (e) {
     console.error(e);
