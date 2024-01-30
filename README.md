@@ -79,7 +79,7 @@ Slack, only for the Discord channels you want. Hooray!
 
 You can backfill a discord channel by copying the channel ID and going to the
 Convex dashboard, going to the "functions" section, and finding
-actions / discord / backfillDiscordChannel .
+discord_node / backfillDiscordChannel .
 Run it with a single parameter: `{ discordId: "1111111111111111111" }`
 replacing the 1's with your discord ID.
 
@@ -126,6 +126,24 @@ After that, any new or updated discord threads in the appopriate channel(s) will
 be added to the Algolia index within a minute. If you ever change the document
 structure, or for any other reason want to trigger a complete re-indexing of
 Algolia, just repeat step (3) above and set the cursor back to zero.
+
+## Verification
+
+There is code in `convex/verification[_node].ts` to handle authenticating a Discord
+user with another bot. For Convex Community, this is the Convex Verification bot.
+When a user logs into Convex and associates their Discord account, we capture
+their userId here, and grant them a role. For this to work, the bot has to be installed with
+scope to "Manage Roles" as well as "identity" and "email" to be able to authenticate.
+It handles this via the `/discord/[un]registerAccount` http endpoints.
+
+This uses a few environment variables:
+
+- VERIFICATION_WEBHOOK_TOKEN: This is the shared secret between the Convex backend
+and this backend to authenticate requests.
+- VERIFICATION_DISCORD_TOKEN: This is the Convex Verification bot token, from the
+[Discord developer portal](https://discord.com/developers/applications).
+- VERIFICATION_GUILD_ID: This is the server ID where it will grant a role.
+- VERIFICATION_ROLE_ID: The role it will grant, e.g. "Verified".
 
 ## Extras
 
