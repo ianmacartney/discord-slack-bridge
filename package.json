@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "convex dev",
     "build": "tsc",
-    "clean": "rm -rf dist",
-    "discord": "node discordBot.js"
+    "prebuild": "rm -rf dist",
+    "discordBot": "npm run build && node dist/discordBot.js",
+    "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
+    "dockerBot": "docker run --init --env-file .env --rm discordBot:latest"
   },
   "dependencies": {
     "@slack/web-api": "^6.8.1",
