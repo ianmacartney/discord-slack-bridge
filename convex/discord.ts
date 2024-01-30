@@ -130,7 +130,7 @@ export const receiveMessage = mutation({
       (message.type === 0 || message.type === 19) &&
       dbChannel.slackChannelId
     ) {
-      await scheduler.runAfter(0, internal.actions.slack.sendMessage, {
+      await scheduler.runAfter(0, internal.slack_node.sendMessage, {
         messageId,
         threadId,
         author: await slackAuthor(db, author),
@@ -188,7 +188,7 @@ export const updateMessage = mutation({
       throw new Error("Channel or author not found:" + channelId + authorId);
     }
     if (channel.slackChannelId && existing.slackTs) {
-      await scheduler.runAfter(0, internal.actions.slack.updateMessage, {
+      await scheduler.runAfter(0, internal.slack_node.updateMessage, {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
         text: message.cleanContent ?? existing.cleanContent,
@@ -227,7 +227,7 @@ export const deleteMessage = mutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackTs) {
-      await scheduler.runAfter(0, internal.actions.slack.deleteMessage, {
+      await scheduler.runAfter(0, internal.slack_node.deleteMessage, {
         messageTs: existing.slackTs,
         channel: channel.slackChannelId,
       });
@@ -251,7 +251,7 @@ export const updateThread = mutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      await scheduler.runAfter(0, internal.actions.slack.updateThread, {
+      await scheduler.runAfter(0, internal.slack_node.updateThread, {
         channel: channel.slackChannelId,
         threadTs: existing.slackThreadTs,
         title: thread.name,
@@ -299,7 +299,7 @@ export const resolveThread = internalMutation({
       appliedTags: tags,
     });
     await touchThread({ db }, { threadId });
-    await scheduler.runAfter(0, internal.actions.discord.applyTags, {
+    await scheduler.runAfter(0, internal.discord_node.applyTags, {
       threadId: thread.id,
       tags,
     });

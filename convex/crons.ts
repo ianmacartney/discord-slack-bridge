@@ -5,6 +5,6 @@ const crons = cronJobs();
 crons.interval(
   "Sync discord support threads with Algolia",
   { minutes: 1 }, // Every minute
-  internal.actions.algolia.index
+  internal.algolia.index
 );
 export default crons;

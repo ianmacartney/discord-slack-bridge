@@ -1,16 +1,16 @@
 "use node";
-import { internal } from "../_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import {
   serializeAuthor,
   serializeChannel,
   serializeMessage,
   serializeThread,
-} from "../../shared/discordUtils";
-import { internalAction } from "../_generated/server";
+} from "../shared/discordUtils";
+import { internalAction } from "./_generated/server";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
-import { Id } from "../_generated/dataModel";
-import { DiscordMessage, DiscordUser } from "../schema";
+import { Id } from "./_generated/dataModel";
+import { DiscordMessage, DiscordUser } from "./schema";
 
 const discordClient = async () => {
   const bot = new Client({

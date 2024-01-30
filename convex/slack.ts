@@ -28,7 +28,7 @@ export const interactivityHandler = httpAction(
         slackUserId,
       });
       if (channelId && user) {
-        await runAction(internal.actions.discord.replyFromSlack, {
+        await runAction(internal.discord_node.replyFromSlack, {
           channelId,
           userId: user._id,
           reply,
@@ -69,7 +69,7 @@ export const interactivityHandler = httpAction(
       case "reply":
         const triggerId = body.trigger_id;
         console.log({ triggerId, messageTs });
-        await runAction(internal.actions.slack.initiateReply, {
+        await runAction(internal.slack_node.initiateReply, {
           triggerId,
           messageTs,
           message: body.message.text,

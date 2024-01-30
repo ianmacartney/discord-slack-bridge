@@ -1,6 +1,6 @@
 "use node";
-import { internal } from "../_generated/api";
-import { internalAction } from "../_generated/server";
+import { internal } from "./_generated/api";
+import { internalAction } from "./_generated/server";
 import { WebClient } from "@slack/web-api";
 import { ObjectType, v } from "convex/values";
 

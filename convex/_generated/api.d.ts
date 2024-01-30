@@ -14,14 +14,14 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as actions_algolia from "../actions/algolia.js";
-import type * as actions_discord from "../actions/discord.js";
-import type * as actions_slack from "../actions/slack.js";
+import type * as algolia from "../algolia.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
+import type * as discord_node from "../discord_node.js";
 import type * as http from "../http.js";
 import type * as indexing from "../indexing.js";
 import type * as slack from "../slack.js";
+import type * as slack_node from "../slack_node.js";
 import type * as utils from "../utils.js";
 
 /**
@@ -33,14 +33,14 @@ import type * as utils from "../utils.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  "actions/algolia": typeof actions_algolia;
-  "actions/discord": typeof actions_discord;
-  "actions/slack": typeof actions_slack;
+  algolia: typeof algolia;
   crons: typeof crons;
   discord: typeof discord;
+  discord_node: typeof discord_node;
   http: typeof http;
   indexing: typeof indexing;
   slack: typeof slack;
+  slack_node: typeof slack_node;
   utils: typeof utils;
 }>;
 export declare const api: FilterApi<
