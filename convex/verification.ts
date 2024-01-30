@@ -8,42 +8,40 @@ import {
 } from "./_generated/server";
 import { v } from "convex/values";
 
-export const registerAccountHandler = httpAction(
-  async ({ runAction, runMutation }, request) => {
-    authorizeWebhookRequest(request);
-    const { associatedAccountId, discordId } = JSON.parse(await request.text());
+export const registerAccountHandler = httpAction(async (ctx, request) => {
+  authorizeWebhookRequest(request);
+  const { associatedAccountId, discordId } = JSON.parse(await request.text());
 
-    // Add the role
+  // Add the role
 
-    await runAction(internal.verification_node.addRole, {
-      discordUserId: discordId,
-    });
+  await ctx.runMutation(internal.verification.insertRegistration, {
+    discordUserId: discordId,
+    associatedAccountId,
+  });
 
-    await runMutation(internal.verification.insertRegistration, {
-      discordUserId: discordId,
-      associatedAccountId,
-    });
+  // Scheduled to prevent failing the request on discord issues
+  await ctx.scheduler.runAfter(0, internal.verification_node.addRole, {
+    discordUserId: discordId,
+  });
 
-    return new Response();
-  }
-);
+  return new Response();
+});
 
-export const unregisterAccountHandler = httpAction(
-  async ({ runAction, runMutation }, request) => {
-    authorizeWebhookRequest(request);
-    const { discordId } = JSON.parse(await request.text());
+export const unregisterAccountHandler = httpAction(async (ctx, request) => {
+  authorizeWebhookRequest(request);
+  const { discordId } = JSON.parse(await request.text());
 
-    await runAction(internal.verification_node.removeRole, {
-      discordUserId: discordId,
-    });
+  await ctx.runMutation(internal.verification.deleteRegistration, {
+    discordUserId: discordId,
+  });
 
-    await runMutation(internal.verification.deleteRegistration, {
-      discordUserId: discordId,
-    });
+  // Scheduled to prevent failing the request on discord issues
+  await ctx.scheduler.runAfter(0, internal.verification_node.removeRole, {
+    discordUserId: discordId,
+  });
 
-    return new Response();
-  }
-);
+  return new Response();
+});
 
 function authorizeWebhookRequest(request: Request) {
   const webhookToken = process.env.VERIFICATION_WEBHOOK_TOKEN;

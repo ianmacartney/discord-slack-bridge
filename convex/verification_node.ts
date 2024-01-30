@@ -39,12 +39,8 @@ export const addRole = internalAction({
     const guild = await bot.guilds.fetch(guildId);
     if (!guild) throw new Error(`Can’t find guild ${guildId}`);
 
-    try {
-      const member = await guild.members.fetch(discordUserId);
-      await member.roles.add(roleId);
-    } catch {
-      // Ignore
-    }
+    const member = await guild.members.fetch(discordUserId);
+    await member.roles.add(roleId);
   },
 });
 
@@ -59,11 +55,7 @@ export const removeRole = internalAction({
     const guild = await bot.guilds.fetch(guildId);
     if (!guild) throw new Error(`Can’t find guild ${guildId}`);
 
-    try {
-      const member = await guild.members.fetch(discordUserId);
-      await member.roles.remove(roleId);
-    } catch {
-      // Ignore
-    }
+    const member = await guild.members.fetch(discordUserId);
+    await member.roles.remove(roleId);
   },
 });
