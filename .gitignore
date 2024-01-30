@@ -2,6 +2,5 @@ node_modules
 .DS_Store
 dist
 .env.local
-convex.json
 .env
 *.swp
