@@ -23,6 +23,8 @@ import type * as indexing from "../indexing.js";
 import type * as slack from "../slack.js";
 import type * as slack_node from "../slack_node.js";
 import type * as utils from "../utils.js";
+import type * as verification from "../verification.js";
+import type * as verification_node from "../verification_node.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -42,6 +44,8 @@ declare const fullApi: ApiFromModules<{
   slack: typeof slack;
   slack_node: typeof slack_node;
   utils: typeof utils;
+  verification: typeof verification;
+  verification_node: typeof verification_node;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

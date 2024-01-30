@@ -1,6 +1,9 @@
 import { httpRouter } from "convex/server";
 import { interactivityHandler, slashHandler } from "./slack";
-import { registerAccountHandler, unregisterAccountHandler } from "./discord";
+import {
+  registerAccountHandler,
+  unregisterAccountHandler,
+} from "./verification";
 
 const http = httpRouter();
 

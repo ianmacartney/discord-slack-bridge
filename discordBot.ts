@@ -104,7 +104,7 @@ bot.on("interactionCreate", async (interaction) => {
 
 bot.on("guildMemberAdd", async (member) => {
   try {
-    await convex.action(api.discord.addRoleIfAccountLinked, {
+    await convex.action(api.verification.addRoleIfAccountLinked, {
       discordUserId: member.id,
     });
   } catch (e) {
