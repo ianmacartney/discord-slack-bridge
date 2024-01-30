@@ -12,7 +12,7 @@ USER node
 WORKDIR /usr/src/app
 ARG DISCORD_TOKEN
 ENV DISCORD_TOKEN=${DISCORD_TOKEN}
-ARG CONVEX_URL="https://addicted-jackal-92.convex.cloud"
+ARG CONVEX_URL
 ENV CONVEX_URL=${CONVEX_URL}
 COPY --chown=node:node ./dist ./
 COPY --chown=node:node ./package.json ./package.json
