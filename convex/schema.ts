@@ -165,8 +165,13 @@ export const Tickets = Table("tickets", {
     type: v.literal("discord"),
     id: v.id("threads"),
   }),
-  assignee: v.id("users"),
+  assignee: v.optional(v.id("users")),
   status: v.union(v.literal("escalated"), v.literal("resolved")),
+});
+
+export const Employees = Table("employees", {
+  userId: v.id("users"),
+  handlesTickets: v.boolean(),
 });
 
 export default defineSchema({
@@ -185,4 +190,5 @@ export default defineSchema({
     indexedCursor: v.number(),
   }),
   tickets: Tickets.table,
+  employees: Employees.table.index("handlesTickets", ["handlesTickets"]),
 });
