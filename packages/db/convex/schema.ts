@@ -189,6 +189,10 @@ export default defineSchema({
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),
+<<<<<<< HEAD:convex/schema.ts
   tickets: Tickets.table,
   employees: Employees.table.index("handlesTickets", ["handlesTickets"]),
+=======
+  tickets: Tickets.table.index("status", ["status"]),
+>>>>>>> aff67f7 (make a monorepo):packages/db/convex/schema.ts
 });

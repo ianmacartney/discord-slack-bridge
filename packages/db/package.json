@@ -1,0 +1,21 @@
+{
+  "name": "db",
+  "private": true,
+  "version": "0.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "convex dev",
+    "build": "tsc",
+    "prebuild": "rm -rf dist",
+    "discordBot": "npm run build && node dist/discordBot.js",
+    "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
+    "dockerBot": "docker run --init --env-file .env --rm discordbot:latest",
+    "setup": "convex dev --until-success"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "convex": "^1.8.0",
+    "openai": "^4.24.7"
+  }
+}

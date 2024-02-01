@@ -1,15 +1,12 @@
 {
-  "name": "convex-support",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "convex dev",
-    "build": "tsc",
-    "prebuild": "rm -rf dist",
-    "discordBot": "npm run build && node dist/discordBot.js",
-    "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
-    "dockerBot": "docker run --init --env-file .env --rm discordbot:latest"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
   },
   "dependencies": {
     "@slack/web-api": "^6.8.1",
@@ -18,9 +15,18 @@
     "convex-helpers": "^0.1.14",
     "discord.js": "^14.9.0",
     "node-fetch": "^3.3.0",
+    "turbo": "latest",
     "typescript": "^5.0.3"
   },
   "devDependencies": {
-    "prettier": "^2.8.4"
-  }
+    "prettier": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@8.9.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
