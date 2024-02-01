@@ -12,13 +12,13 @@ export const DiscordChannel = {
     v.array(
       v.object({
         emoji: nullable(
-          v.object({ id: nullable(v.string()), name: nullable(v.string()) })
+          v.object({ id: nullable(v.string()), name: nullable(v.string()) }),
         ),
         id: v.string(),
         moderated: v.boolean(),
         name: v.string(),
-      })
-    )
+      }),
+    ),
   ),
   createdTimestamp: nullable(v.number()),
   flags: v.optional(v.number()),
@@ -61,7 +61,7 @@ export const DiscordMessage = {
       channelId: v.string(),
       guildId: v.optional(v.string()),
       messageId: v.optional(v.string()),
-    })
+    }),
   ),
   system: v.boolean(),
   type: v.number(),
@@ -184,15 +184,15 @@ export default defineSchema({
     .index("id", ["id"])
     .index("slackThreadTs", ["slackThreadTs"])
     .index("version", ["version"]),
-  users: Users.table.index("id", ["id"]),
+  users: Users.table
+    .index("id", ["id"])
+    .searchIndex("username", { searchField: "username" })
+    .searchIndex("nickname", { searchField: "nickname" })
+    .searchIndex("displayName", { searchField: "displayName" }),
   registrations: Registrations.table.index("discordUserId", ["discordUserId"]),
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),
-<<<<<<< HEAD:convex/schema.ts
-  tickets: Tickets.table,
-  employees: Employees.table.index("handlesTickets", ["handlesTickets"]),
-=======
   tickets: Tickets.table.index("status", ["status"]),
->>>>>>> aff67f7 (make a monorepo):packages/db/convex/schema.ts
+  employees: Employees.table.index("handlesTickets", ["handlesTickets"]),
 });
