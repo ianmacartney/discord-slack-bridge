@@ -16,7 +16,7 @@ import {
 } from "./schema";
 import { v } from "convex/values";
 import { apiMutation } from "./apiFunctions";
-import { createTicket } from "./tickets";
+import { createTicket, shouldCreateTicketForDiscordThread } from "./tickets";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -115,7 +115,9 @@ export const receiveMessage = apiMutation({
       threadId = await getOrCreate(ctx.db, "threads", { ...thread, channelId });
       await touchThread(ctx, { threadId });
       dbThread = (await ctx.db.get(threadId))!;
-      await createTicket(ctx, dbThread._id);
+      if (shouldCreateTicketForDiscordThread(dbChannel)) {
+        await createTicket(ctx, dbThread._id);
+      }
     }
     const messageId = await getOrCreate(ctx.db, "messages", {
       ...message,

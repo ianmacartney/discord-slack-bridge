@@ -6,6 +6,11 @@ import {
   internalAction,
   internalMutation,
 } from "./_generated/server";
+import { DiscordChannel } from "./schema";
+
+export function shouldCreateTicketForDiscordThread(thread: DiscordChannel) {
+  return thread.name === "support";
+}
 
 export async function createTicket(ctx: MutationCtx, threadId: Id<"threads">) {
   const ticketId = await ctx.db.insert("tickets", {
