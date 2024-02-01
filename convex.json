@@ -1,5 +1,7 @@
 {
   "node": {
-    "externalPackages": ["discord.js"]
+    "externalPackages": [
+      "discord.js"
+    ]
   }
 }
