@@ -24,6 +24,7 @@ import type * as indexing from "../indexing.js";
 import type * as slack from "../slack.js";
 import type * as slack_node from "../slack_node.js";
 import type * as tickets from "../tickets.js";
+import type * as users from "../users.js";
 import type * as utils from "../utils.js";
 import type * as verification from "../verification.js";
 import type * as verification_node from "../verification_node.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   slack: typeof slack;
   slack_node: typeof slack_node;
   tickets: typeof tickets;
+  users: typeof users;
   utils: typeof utils;
   verification: typeof verification;
   verification_node: typeof verification_node;

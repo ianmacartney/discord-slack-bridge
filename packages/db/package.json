@@ -15,11 +15,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@slack/web-api": "^6.8.1",
+    "algoliasearch": "^4.17.0",
     "convex": "^1.8.0",
+    "convex-helpers": "^0.1.15",
+    "discord.js": "^14.9.0",
+    "node-fetch": "^3.3.0",
     "lodash": "^4.17.21",
     "openai": "^4.24.7"
   },
   "devDependencies": {
+    "typescript": "^5.0.3",
     "@types/lodash": "^4.14.202"
   }
 }
