@@ -8,17 +8,8 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
   },
-  "dependencies": {
-    "@slack/web-api": "^6.8.1",
-    "algoliasearch": "^4.17.0",
-    "convex": "^1.7.1",
-    "convex-helpers": "^0.1.14",
-    "discord.js": "^14.9.0",
-    "node-fetch": "^3.3.0",
-    "turbo": "latest",
-    "typescript": "^5.0.3"
-  },
   "devDependencies": {
+    "turbo": "latest",
     "prettier": "^3.1.0"
   },
   "engines": {
