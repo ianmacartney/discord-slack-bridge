@@ -16,6 +16,7 @@ import {
 } from "./schema";
 import { v } from "convex/values";
 import { apiMutation } from "./apiFunctions";
+import { createTicket } from "./tickets";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -105,17 +106,18 @@ export const receiveMessage = apiMutation({
     channel: v.object(DiscordChannel),
     thread: v.optional(v.object(DiscordThread)),
   },
-  handler: async ({ db, scheduler }, { author, message, channel, thread }) => {
-    const authorId = await getOrCreate(db, "users", author);
-    const channelId = await getOrCreate(db, "channels", channel);
-    const dbChannel = (await db.get(channelId))!;
+  handler: async (ctx, { author, message, channel, thread }) => {
+    const authorId = await getOrCreate(ctx.db, "users", author);
+    const channelId = await getOrCreate(ctx.db, "channels", channel);
+    const dbChannel = (await ctx.db.get(channelId))!;
     let dbThread, threadId;
     if (thread) {
-      threadId = await getOrCreate(db, "threads", { ...thread, channelId });
-      await touchThread({ db }, { threadId });
-      dbThread = (await db.get(threadId))!;
+      threadId = await getOrCreate(ctx.db, "threads", { ...thread, channelId });
+      await touchThread(ctx, { threadId });
+      dbThread = (await ctx.db.get(threadId))!;
+      await createTicket(ctx, dbThread._id);
     }
-    const messageId = await getOrCreate(db, "messages", {
+    const messageId = await getOrCreate(ctx.db, "messages", {
       ...message,
       authorId,
       channelId,
@@ -128,10 +130,10 @@ export const receiveMessage = apiMutation({
       (message.type === 0 || message.type === 19) &&
       dbChannel.slackChannelId
     ) {
-      await scheduler.runAfter(0, internal.slack_node.sendMessage, {
+      await ctx.scheduler.runAfter(0, internal.slack_node.sendMessage, {
         messageId,
         threadId,
-        author: await slackAuthor(db, author),
+        author: await slackAuthor(ctx.db, author),
         text: message.cleanContent,
         channel: dbChannel.slackChannelId,
         channelName: dbChannel.name,
