@@ -159,6 +159,16 @@ export const Registrations = Table("registrations", {
   associatedAccountId: v.string(),
 });
 
+export const Tickets = Table("tickets", {
+  updateTime: v.number(),
+  source: v.object({
+    type: v.literal("discord"),
+    id: v.id("threads"),
+  }),
+  assignee: v.id("users"),
+  status: v.union(v.literal("escalated"), v.literal("resolved")),
+});
+
 export default defineSchema({
   channels: Channels.table.index("id", ["id"]),
   messages: Messages.table
@@ -174,4 +184,5 @@ export default defineSchema({
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),
+  tickets: Tickets.table,
 });
