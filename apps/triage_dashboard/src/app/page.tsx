@@ -17,18 +17,3 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function Home() {
   return <>Body</>;
 }
-
-function SignInAndSignUpButtons() {
-  return (
-    <div className="flex gap-4">
-      <Authenticated>
-        <UserButton afterSignOutUrl="#" />
-      </Authenticated>
-      <Unauthenticated>
-        <SignInButton mode="modal">
-          <Button variant="ghost">Sign in</Button>
-        </SignInButton>
-      </Unauthenticated>
-    </div>
-  );
-}
