@@ -46,3 +46,7 @@ export const addEmployees = internalMutation({
     }
   },
 });
+
+export function isEmployeeEmail(email: string) {
+  return email.endsWith("@convex.dev");
+}

@@ -12,6 +12,7 @@ import { DiscordChannel } from "./schema";
 import { paginationOptsValidator } from "convex/server";
 import { asyncMap } from "convex-helpers";
 import { resolveThread } from "./discord";
+import { isEmployeeEmail } from "./users";
 
 export function shouldCreateTicketForDiscordThread(thread: DiscordChannel) {
   return thread.name === "support";
@@ -47,7 +48,8 @@ export const assignRandomEmployee = internalMutation({
 });
 
 export const getTickets = query({
-  args: { resolved: v.boolean(),
+  args: {
+    resolved: v.boolean(),
     paginationOpts: paginationOptsValidator,
     mine: v.boolean(),
   },
@@ -60,27 +62,34 @@ export const getTickets = query({
     if (!email || !identity.emailVerified) {
       throw new Error("Email not present or verified");
     }
-    const employee = await ctx.db.query("employees").withIndex("email", q => q.eq("email", email)).unique();
-    if (!employee) {
-      throw new Error("Employee not found");
+    if (!isEmployeeEmail(email)) {
+      throw new Error("Invalid employee email");
     }
-    const query = ctx.db.query("tickets")
-    const filtered = args.mine ? query.withIndex("assignee", (q) => q.eq("assignee", employee._id)) : query;
-
+    const currentEmployee = await ctx.db
+      .query("employees")
+      .withIndex("email", (q) => q.eq("email", email))
+      .unique();
+    const query = ctx.db.query("tickets");
+    const filtered =
+      args.mine && currentEmployee !== null
+        ? query.withIndex("assignee", (q) =>
+            q.eq("assignee", currentEmployee._id),
+          )
+        : query;
 
     const ret = await filtered.paginate(args.paginationOpts);
-    const page = await asyncMap(ret.page,
-    async (ticket) => {
-      const assignee = ticket.assignee && await ctx.db.get(ticket.assignee)
-      const assigneeUser = assignee && await ctx.db.get(assignee.userId);
+    const page = await asyncMap(ret.page, async (ticket) => {
+      const assignee = ticket.assignee && (await ctx.db.get(ticket.assignee));
+      const assigneeUser = assignee && (await ctx.db.get(assignee.userId));
       const discordThread = await ctx.db.get(ticket.source.id);
-      return {...ticket, name: assigneeUser?.displayName,
+      return {
+        ...ticket,
+        name: assigneeUser?.displayName,
         title: discordThread!.name,
-      }
-
+      };
     });
 
-    return {...ret,page }
+    return { ...ret, page };
   },
 });
 export function emptyPage() {
@@ -96,22 +105,20 @@ export function emptyPage() {
 }
 
 export const assignTicket = mutation({
-  args: {ticketId: v.id("tickets"), },
+  args: { ticketId: v.id("tickets") },
   handler: async (ctx, args) => {
     console.log(args);
-
   },
 });
 
 export const resolveTicket = mutation({
-  args: {ticketId: v.id("tickets"), },
+  args: { ticketId: v.id("tickets") },
   handler: async (ctx, args) => {
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) {
       throw new Error("Ticket not found");
     }
 
-    await resolveThread(ctx, {threadId: ticket?.source.id});
-
+    await resolveThread(ctx, { threadId: ticket?.source.id });
   },
 });
