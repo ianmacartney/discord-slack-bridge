@@ -28,7 +28,20 @@ import { getDateTime, getRelativeTime } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function Triage() {
+export default function TriagePage() {
+  return (
+    <>
+      <Authenticated>
+        <Triage />
+      </Authenticated>
+      <Unauthenticated>
+        <div className="container p-10">Sign in above.</div>
+      </Unauthenticated>
+    </>
+  );
+}
+
+function Triage() {
   const [resolved, setResolved] = useState(false);
   const { isLoading, loadMore, results, status } = usePaginatedQuery(
     api.tickets.getTickets,

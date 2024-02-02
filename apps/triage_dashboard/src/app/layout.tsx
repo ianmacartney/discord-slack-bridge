@@ -5,6 +5,7 @@ import ConvexClientProvider from "./ConvexClientProvider";
 import { Footer } from "@/components/layout/footer";
 import { StickyHeader } from "@/components/layout/sticky-header";
 import { SignInAndSignUpButtons } from "../components/SignInAndSignUpButtons";
+import { Authenticated } from "convex/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,7 +27,6 @@ export default function RootLayout({
             Discord Triage
             <SignInAndSignUpButtons />
           </StickyHeader>
-          {/* Remove `container` if you want full-page width layout */}
           <main className="min-h-[calc(100vh-(2.5rem+1px))]">{children}</main>
           <Footer>Footer below fold</Footer>
         </ConvexClientProvider>
