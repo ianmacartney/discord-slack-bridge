@@ -5,8 +5,10 @@ import {
   MutationCtx,
   internalAction,
   internalMutation,
+  query,
 } from "./_generated/server";
 import { DiscordChannel } from "./schema";
+import { paginationOptsValidator } from "convex/server";
 
 export function shouldCreateTicketForDiscordThread(thread: DiscordChannel) {
   return thread.name === "support";
@@ -39,5 +41,15 @@ export const assignRandomEmployee = internalMutation({
       possibleAssignees[Math.floor(Math.random() * possibleAssignees.length)];
     const assignee = (await ctx.db.get(assigneeEmployee.userId))!;
     await ctx.db.patch(ticketId, { assignee: assignee._id });
+  },
+});
+
+export const getTickets = query({
+  args: { resolved: v.boolean(),
+    paginationOpts: paginationOptsValidator
+  },
+  handler: async (ctx, args) => {
+    const tickets = await ctx.db.query("tickets").paginate(args.paginationOpts);
+    return tickets;
   },
 });
