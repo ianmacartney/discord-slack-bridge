@@ -35,10 +35,14 @@ export const list = internalQuery({
 });
 
 export const addEmployees = internalMutation({
-  args: { userIds: v.array(v.id("users")) },
-  handler: async (ctx, { userIds }) => {
-    for (const userId of userIds) {
-      await ctx.db.insert("employees", { userId, handlesTickets: true });
+  args: { users: v.array(v.object({ id: v.id("users"), email: v.string() })) },
+  handler: async (ctx, { users }) => {
+    for (const { id, email } of users) {
+      await ctx.db.insert("employees", {
+        userId: id,
+        handlesTickets: true,
+        email,
+      });
     }
   },
 });

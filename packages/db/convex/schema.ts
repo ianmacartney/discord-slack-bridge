@@ -172,6 +172,7 @@ export const Tickets = Table("tickets", {
 export const Employees = Table("employees", {
   userId: v.id("users"),
   handlesTickets: v.boolean(),
+  email: v.string(),
 });
 
 export default defineSchema({
