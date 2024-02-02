@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ConvexClientProvider from "./ConvexClientProvider";
+import { Footer } from "@/components/layout/footer";
+import { StickyHeader } from "@/components/layout/sticky-header";
+import { SignInAndSignUpButtons } from "../components/SignInAndSignUpButtons";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +21,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <ConvexClientProvider>
+          <StickyHeader className="p-2 flex items-center justify-between h-[3.25rem]">
+            Discord Triage
+            <SignInAndSignUpButtons />
+          </StickyHeader>
+          {/* Remove `container` if you want full-page width layout */}
+          <main className="min-h-[calc(100vh-(2.5rem+1px))]">{children}</main>
+          <Footer>Footer below fold</Footer>
+        </ConvexClientProvider>
       </body>
     </html>
   );
