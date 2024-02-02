@@ -165,9 +165,11 @@ export const Tickets = Table("tickets", {
     type: v.literal("discord"),
     id: v.id("threads"),
   }),
-  assignee: v.optional(v.id("users")),
+  assignee: v.optional(v.id("employees")),
   status: v.union(v.literal("escalated"), v.literal("resolved")),
 });
+const tickets = Tickets.table.index("status", ["status"]).index("assignee", ["assignee"])
+
 
 export const Employees = Table("employees", {
   userId: v.id("users"),
@@ -194,7 +196,7 @@ export default defineSchema({
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
   }),
-  tickets: Tickets.table.index("status", ["status"]),
+  tickets,
   employees: Employees.table
     .index("handlesTickets", ["handlesTickets"])
     .index("email", ["email"]),
