@@ -195,5 +195,7 @@ export default defineSchema({
     indexedCursor: v.number(),
   }),
   tickets: Tickets.table.index("status", ["status"]),
-  employees: Employees.table.index("handlesTickets", ["handlesTickets"]),
+  employees: Employees.table
+    .index("handlesTickets", ["handlesTickets"])
+    .index("email", ["email"]),
 });
