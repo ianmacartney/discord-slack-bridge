@@ -13,6 +13,7 @@ export function serializeThread(discordThread: ThreadChannel): DiscordThread {
     archived: discordThread.archived,
     createdTimestamp: discordThread.createdTimestamp ?? Date.now(),
     flags: discordThread.flags.valueOf(),
+    guildId: discordThread.guildId,
     id: discordThread.id,
     invitable: discordThread.invitable,
     name: discordThread.name,

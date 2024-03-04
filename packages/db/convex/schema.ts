@@ -99,6 +99,7 @@ export const DiscordThread = {
   archived: nullable(v.boolean()),
   createdTimestamp: v.number(),
   flags: v.number(),
+  guildId: v.optional(v.string()),
   id: v.string(),
   invitable: nullable(v.boolean()),
   locked: nullable(v.boolean()),
@@ -116,7 +117,6 @@ export const Threads = Table("threads", {
   // Legacy fields
   autoArchiveDuration: deprecated,
   guild: deprecated,
-  guildId: deprecated,
   lastMessageId: deprecated,
   lastPinTimestamp: deprecated,
   memberCount: deprecated,
