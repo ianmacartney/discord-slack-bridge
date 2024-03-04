@@ -155,7 +155,7 @@ export const receiveMessage = apiMutation({
 
 function makeLinkUrl(dbThread: Doc<"threads"> | undefined) {
   return dbThread
-    ? `https://discord.com/channels/${dbThread.guildId}/${dbThread.id}`
+    ? `https://discord.com/channels/1019350475847499849/${dbThread.id}`
     : undefined;
 }
 
