@@ -238,10 +238,13 @@ export const deleteMessage = apiMutation({
 });
 
 function threadSlackParams(channel: Doc<"channels">, thread: Doc<"threads">) {
+  if (!channel.slackChannelId) {
+    throw new Error("Channel not found:" + channel._id);
+  }
   return {
         channel: channel.slackChannelId,
         channelName: channel.name,
-        threadTs: thread.slackThreadTs,
+        threadTs: thread.slackThreadTs!, // ! is a bit of a lie
         title: thread.name + thread.archived ? " (archived)" : "",
         linkUrl: makeLinkUrl(thread),
         emojis:
