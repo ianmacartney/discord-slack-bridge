@@ -3,7 +3,7 @@ import { ObjectType, Validator, v } from "convex/values";
 import { Table } from "./utils";
 
 // Utility validators
-const deprecated = v.optional(v.any());
+const deprecated = v.optional(v.any()) as Validator<null, true>;
 const nullable = <T extends Validator<any, any, any>>(validator: T) =>
   v.union(v.null(), validator);
 
