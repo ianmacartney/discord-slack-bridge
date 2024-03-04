@@ -137,17 +137,10 @@ export const receiveMessage = apiMutation({
         threadId,
         author: await slackAuthor(ctx.db, author),
         text: message.cleanContent,
+        ...(dbThread ? threadSlackParams(dbChannel, dbThread) : {
         channel: dbChannel.slackChannelId,
         channelName: dbChannel.name,
-        threadTs: dbThread?.slackThreadTs,
-        title: dbThread?.name,
-        linkUrl: makeLinkUrl(dbThread),
-        emojis: dbThread?.appliedTags
-          .map(
-            (tagId) =>
-              dbChannel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
-          )
-          .filter((e) => e) as string[],
+        }),
       });
     }
   },
@@ -244,6 +237,23 @@ export const deleteMessage = apiMutation({
   },
 });
 
+function threadSlackParams(channel: Doc<"channels">, thread: Doc<"threads">) {
+  return {
+        channel: channel.slackChannelId,
+        channelName: channel.name,
+        threadTs: thread.slackThreadTs,
+        title: thread.name + thread.archived ? " (archived)" : "",
+        linkUrl: makeLinkUrl(thread),
+        emojis:
+          (thread.appliedTags
+            ?.map(
+              (tagId) =>
+                channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
+            )
+            .filter((e) => e) as string[]) ?? [],
+  };
+}
+
 export const updateThread = apiMutation({
   args: {
     previous: v.object(DiscordThread),
@@ -260,20 +270,9 @@ export const updateThread = apiMutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      await scheduler.runAfter(0, internal.slack_node.updateThread, {
-        channel: channel.slackChannelId,
-        threadTs: existing.slackThreadTs,
-        title: thread.name,
-        linkUrl: makeLinkUrl(existing),
-        channelName: channel.name,
-        emojis:
-          (thread.appliedTags
-            ?.map(
-              (tagId) =>
-                channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
-            )
-            .filter((e) => e) as string[]) ?? [],
-      });
+      await scheduler.runAfter(0, internal.slack_node.updateThread,
+        threadSlackParams(channel, {...existing, ...thread})
+      );
     }
   },
 });
