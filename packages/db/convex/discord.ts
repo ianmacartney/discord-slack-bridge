@@ -277,6 +277,26 @@ export const updateThread = apiMutation({
   },
 });
 
+// To refresh the info of all threads, if we change the format e.g.
+export const refreshThreads = internalMutation({
+  args: {},
+  handler: async (ctx, args) => {
+    const threads = await ctx.db.query("threads").collect();
+    let after = 0;
+    for (const thread of threads) {
+      const channel = await ctx.db.get(thread.channelId);
+      if (!channel) throw new Error("Channel not found:" + thread.channelId);
+      if (channel.slackChannelId && thread.slackThreadTs) {
+        await ctx.scheduler.runAfter(after, internal.slack_node.updateThread,
+          threadSlackParams(channel, thread)
+        );
+        after += 1000;
+      }
+    }
+  },
+});
+
+
 // TODO: make generic and look up dynamically
 const ResolvedTagId = "1088163249410818230";
 
