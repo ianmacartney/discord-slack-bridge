@@ -127,11 +127,11 @@ importers:
         specifier: ^4.17.0
         version: 4.22.1
       convex:
-        specifier: ^1.8.0
-        version: 1.8.0(@clerk/clerk-react@4.30.3)(react-dom@18.2.0)(react@18.2.0)
+        specifier: ^1.10.0
+        version: 1.10.0
       convex-helpers:
         specifier: ^0.1.15
-        version: 0.1.15(convex@1.8.0)
+        version: 0.1.15(convex@1.10.0)
       discord.js:
         specifier: ^14.9.0
         version: 14.14.1
@@ -1942,7 +1942,7 @@ packages:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
-  /convex-helpers@0.1.15(convex@1.8.0):
+  /convex-helpers@0.1.15(convex@1.10.0):
     resolution: {integrity: sha512-G9MNXH4CsBfnwNCsFH3vjVBpiWGiz2cRYz6oHLEyKjqGJe6XKbD7B0y5r3pAOCokaY6q6NcfamqAFwrMdUIOJw==}
     peerDependencies:
       convex: ^1.8.0
@@ -1954,7 +1954,33 @@ packages:
       zod:
         optional: true
     dependencies:
-      convex: 1.8.0(@clerk/clerk-react@4.30.3)(react-dom@18.2.0)(react@18.2.0)
+      convex: 1.10.0
+    dev: false
+
+  /convex@1.10.0:
+    resolution: {integrity: sha512-dGU3K3z63e4JQSq4AQthgxUADux1/0qfgFBtOsolcPo+ilV2Dp5wfBJYMOvLi7wkmNvJ+b3I90XfLPGfGzQrWw==}
+    engines: {node: '>=16.15.1', npm: '>=7.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@auth0/auth0-react': ^2.0.1
+      '@clerk/clerk-react': ^4.12.8
+      react: ^17.0.2 || ^18.0.0
+      react-dom: ^17.0.2 || ^18.0.0
+    peerDependenciesMeta:
+      '@auth0/auth0-react':
+        optional: true
+      '@clerk/clerk-react':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+    dependencies:
+      esbuild: 0.17.19
+      jwt-decode: 3.1.2
+      node-fetch: 2.6.9
+    transitivePeerDependencies:
+      - encoding
     dev: false
 
   /convex@1.8.0(@clerk/clerk-react@4.30.3)(react-dom@18.2.0)(react@18.2.0):
