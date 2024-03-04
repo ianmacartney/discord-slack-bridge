@@ -245,7 +245,7 @@ function threadSlackParams(channel: Doc<"channels">, thread: Doc<"threads">) {
         channel: channel.slackChannelId,
         channelName: channel.name,
         threadTs: thread.slackThreadTs!, // ! is a bit of a lie
-        title: thread.name + thread.archived ? " (archived)" : "",
+        title: thread.name + (thread.archived ? " (archived)" : ""),
         linkUrl: makeLinkUrl(thread),
         emojis:
           (thread.appliedTags
@@ -284,7 +284,7 @@ export const updateThread = apiMutation({
 export const refreshThreads = internalMutation({
   args: {},
   handler: async (ctx, args) => {
-    const threads = await ctx.db.query("threads").collect();
+    const threads = await ctx.db.query("threads").order("desc").take(1000);
     let after = 0;
     for (const thread of threads) {
       const channel = await ctx.db.get(thread.channelId);
