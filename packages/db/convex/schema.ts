@@ -168,8 +168,9 @@ export const Tickets = Table("tickets", {
   assignee: v.optional(v.id("employees")),
   status: v.union(v.literal("escalated"), v.literal("resolved")),
 });
-const tickets = Tickets.table.index("status", ["status"]).index("assignee", ["assignee"])
-
+const tickets = Tickets.table
+  .index("status", ["status"])
+  .index("assignee", ["assignee"]);
 
 export const Employees = Table("employees", {
   userId: v.id("users"),

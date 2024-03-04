@@ -22,7 +22,7 @@ type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
   db: DatabaseWriter,
   table: TableName,
-  doc: WithoutSystemFields<Doc<TableName>>
+  doc: WithoutSystemFields<Doc<TableName>>,
 ) => {
   const existing = await db
     .query(table)
@@ -37,7 +37,7 @@ const getOrCreate = async <TableName extends DiscordRelatedTables>(
 
 const touchThread = async (
   { db }: { db: DatabaseWriter },
-  { threadId }: { threadId: Id<"threads"> }
+  { threadId }: { threadId: Id<"threads"> },
 ) => {
   // Get maximum version from any thread.
   const mostRecent = await db
@@ -58,7 +58,7 @@ export const addUniqueDoc = internalMutation({
     }: {
       table: TableName;
       doc: WithoutSystemFields<Doc<TableName>>;
-    }
+    },
   ) => {
     return await getOrCreate(db, table, doc);
   },
@@ -85,7 +85,7 @@ export const addThreadBatch = internalMutation(
       authorsAndMessagesToAdd: [DiscordUser, DiscordMessage][];
       threadId: Id<"threads">;
       channelId: Id<"channels">;
-    }
+    },
   ) => {
     for (const [author, message] of authorsAndMessagesToAdd) {
       const authorId = await getOrCreate(db, "users", author);
@@ -96,7 +96,7 @@ export const addThreadBatch = internalMutation(
         channelId,
       });
     }
-  }
+  },
 );
 
 export const receiveMessage = apiMutation({
@@ -145,7 +145,7 @@ export const receiveMessage = apiMutation({
         emojis: dbThread?.appliedTags
           .map(
             (tagId) =>
-              dbChannel.availableTags?.find((t) => t.id === tagId)?.emoji?.name
+              dbChannel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
           )
           .filter((e) => e) as string[],
       });
@@ -169,7 +169,7 @@ export const updateMessage = mutation({
     {
       message,
       apiToken,
-    }: { message: Partial<DiscordMessage> & { id: string }; apiToken: string }
+    }: { message: Partial<DiscordMessage> & { id: string }; apiToken: string },
   ) => {
     if (apiToken !== process.env.CONVEX_API_TOKEN) {
       // TODO: just use apiMutation once we have arg validation here.
@@ -270,7 +270,7 @@ export const updateThread = apiMutation({
           (thread.appliedTags
             ?.map(
               (tagId) =>
-                channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name
+                channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
             )
             .filter((e) => e) as string[]) ?? [],
       });
