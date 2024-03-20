@@ -137,10 +137,12 @@ export const receiveMessage = apiMutation({
         threadId,
         author: await slackAuthor(ctx.db, author),
         text: message.cleanContent,
-        ...(dbThread ? threadSlackParams(dbChannel, dbThread) : {
-        channel: dbChannel.slackChannelId,
-        channelName: dbChannel.name,
-        }),
+        ...(dbThread
+          ? threadSlackParams(dbChannel, dbThread)
+          : {
+              channel: dbChannel.slackChannelId,
+              channelName: dbChannel.name,
+            }),
       });
     }
   },
@@ -242,18 +244,18 @@ function threadSlackParams(channel: Doc<"channels">, thread: Doc<"threads">) {
     throw new Error("Channel not found:" + channel._id);
   }
   return {
-        channel: channel.slackChannelId,
-        channelName: channel.name,
-        threadTs: thread.slackThreadTs!, // ! is a bit of a lie
-        title: thread.name + (thread.archived ? " (archived)" : ""),
-        linkUrl: makeLinkUrl(thread),
-        emojis:
-          (thread.appliedTags
-            ?.map(
-              (tagId) =>
-                channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
-            )
-            .filter((e) => e) as string[]) ?? [],
+    channel: channel.slackChannelId,
+    channelName: channel.name,
+    threadTs: thread.slackThreadTs!, // ! is a bit of a lie
+    title: thread.name + (thread.archived ? " (archived)" : ""),
+    linkUrl: makeLinkUrl(thread),
+    emojis:
+      (thread.appliedTags
+        ?.map(
+          (tagId) =>
+            channel.availableTags?.find((t) => t.id === tagId)?.emoji?.name,
+        )
+        .filter((e) => e) as string[]) ?? [],
   };
 }
 
@@ -273,8 +275,10 @@ export const updateThread = apiMutation({
     const channel = await db.get(existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      await scheduler.runAfter(0, internal.slack_node.updateThread,
-        threadSlackParams(channel, {...existing, ...thread})
+      await scheduler.runAfter(
+        0,
+        internal.slack_node.updateThread,
+        threadSlackParams(channel, { ...existing, ...thread }),
       );
     }
   },
@@ -283,22 +287,23 @@ export const updateThread = apiMutation({
 // To refresh the info of all threads, if we change the format e.g.
 export const refreshThreads = internalMutation({
   args: {},
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const threads = await ctx.db.query("threads").order("desc").take(1000);
     let after = 0;
     for (const thread of threads) {
       const channel = await ctx.db.get(thread.channelId);
       if (!channel) throw new Error("Channel not found:" + thread.channelId);
       if (channel.slackChannelId && thread.slackThreadTs) {
-        await ctx.scheduler.runAfter(after, internal.slack_node.updateThread,
-          threadSlackParams(channel, thread)
+        await ctx.scheduler.runAfter(
+          after,
+          internal.slack_node.updateThread,
+          threadSlackParams(channel, thread),
         );
         after += 1000;
       }
     }
   },
 });
-
 
 // TODO: make generic and look up dynamically
 const ResolvedTagId = "1088163249410818230";

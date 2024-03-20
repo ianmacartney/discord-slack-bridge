@@ -106,7 +106,7 @@ export function emptyPage() {
 
 export const assignTicket = mutation({
   args: { ticketId: v.id("tickets") },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     console.log(args);
   },
 });
