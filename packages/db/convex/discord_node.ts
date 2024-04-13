@@ -76,8 +76,6 @@ export const backfillDiscordChannel = internalAction({
         });
       }
     }
-    // Reset all versions as new for search indexing.
-    await runMutation(internal.discord.forceRefreshVersions, {});
   },
 });
 

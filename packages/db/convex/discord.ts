@@ -65,11 +65,24 @@ export const addUniqueDoc = internalMutation({
 });
 
 export const forceRefreshVersions = internalMutation({
-  args: {},
-  handler: async ({ db }, {}) => {
-    const ids = (await db.query("threads").collect()).map((d) => d._id);
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const results = await ctx.db
+      .query("threads")
+      .paginate({ cursor: args.cursor ?? null, numItems: 100 });
+    const ids = results.page.map((d) => d._id);
+    let nextVersion =
+      (await ctx.db.query("threads").withIndex("version").order("desc").first())
+        ?.version ?? 0;
+
     for (const threadId of ids) {
-      await touchThread({ db }, { threadId });
+      await ctx.db.patch(threadId, { version: nextVersion });
+      nextVersion += 1;
+    }
+    if (!results.isDone) {
+      await ctx.scheduler.runAfter(0, internal.discord.forceRefreshVersions, {
+        cursor: results.continueCursor,
+      });
     }
   },
 });
@@ -96,6 +109,7 @@ export const addThreadBatch = internalMutation(
         channelId,
       });
     }
+    await touchThread({ db }, { threadId });
   },
 );
 
