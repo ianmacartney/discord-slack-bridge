@@ -130,8 +130,8 @@ importers:
         specifier: ^1.10.0
         version: 1.10.0
       convex-helpers:
-        specifier: ^0.1.15
-        version: 0.1.15(convex@1.10.0)
+        specifier: 0.1.30-alpha.0
+        version: 0.1.30-alpha.0(convex@1.10.0)
       discord.js:
         specifier: ^14.9.0
         version: 14.14.1
@@ -1942,13 +1942,16 @@ packages:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
-  /convex-helpers@0.1.15(convex@1.10.0):
-    resolution: {integrity: sha512-G9MNXH4CsBfnwNCsFH3vjVBpiWGiz2cRYz6oHLEyKjqGJe6XKbD7B0y5r3pAOCokaY6q6NcfamqAFwrMdUIOJw==}
+  /convex-helpers@0.1.30-alpha.0(convex@1.10.0):
+    resolution: {integrity: sha512-i28+8zYwvAgoecaIEErWhXhbo8z/uZFK0Xyahdj4gu97Q1Zmn2EzmZ9q4rgY9+Tjc2s/HYjmIQyOCCzVz1C2zw==}
     peerDependencies:
-      convex: ^1.8.0
+      convex: ^1.11.0
+      hono: ^4.0.5
       react: ^17.0.2 || ^18.0.0
       zod: ^3.22.4
     peerDependenciesMeta:
+      hono:
+        optional: true
       react:
         optional: true
       zod:

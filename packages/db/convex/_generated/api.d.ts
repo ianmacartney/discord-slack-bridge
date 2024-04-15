@@ -21,6 +21,7 @@ import type * as discord from "../discord.js";
 import type * as discord_node from "../discord_node.js";
 import type * as http from "../http.js";
 import type * as indexing from "../indexing.js";
+import type * as migrations from "../migrations.js";
 import type * as slack from "../slack.js";
 import type * as slack_node from "../slack_node.js";
 import type * as tickets from "../tickets.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   discord_node: typeof discord_node;
   http: typeof http;
   indexing: typeof indexing;
+  migrations: typeof migrations;
   slack: typeof slack;
   slack_node: typeof slack_node;
   tickets: typeof tickets;
