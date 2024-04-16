@@ -4,7 +4,7 @@ import { Table } from "./utils";
 import { migrationsTable } from "convex-helpers/server/migrations";
 
 // Utility validators
-const deprecated = v.optional(v.any()) as Validator<null, true>;
+// const deprecated = v.optional(v.any()) as Validator<null, true>;
 const nullable = <T extends Validator<any, any, any>>(validator: T) =>
   v.union(v.null(), validator);
 
@@ -34,19 +34,6 @@ export const Channels = Table("channels", {
   slackChannelId: v.optional(v.string()),
   indexForSearch: v.optional(v.boolean()),
   ...DiscordChannel,
-  // Legacy fields
-  defaultAutoArchiveDuration: deprecated,
-  defaultForumLayout: deprecated,
-  defaultReactionEmoji: deprecated,
-  defaultSortOrder: deprecated,
-  defaultThreadRateLimitPerUser: deprecated,
-  guild: deprecated,
-  guildId: deprecated,
-  lastMessageId: deprecated,
-  nsfw: deprecated,
-  permissionOverwrites: deprecated,
-  rateLimitPerUser: deprecated,
-  rawPosition: deprecated,
 });
 
 export const DiscordMessage = {
@@ -76,22 +63,6 @@ export const Messages = Table("messages", {
   threadId: v.optional(v.id("threads")),
   slackTs: v.optional(v.string()),
   ...DiscordMessage,
-  // Legacy fields
-  activity: deprecated,
-  applicationId: deprecated,
-  attachments: deprecated,
-  components: deprecated,
-  embeds: deprecated,
-  interaction: deprecated,
-  guildId: deprecated,
-  groupActivityApplicationId: deprecated,
-  mentions: deprecated,
-  nonce: deprecated,
-  position: deprecated,
-  roleSubscriptionData: deprecated,
-  stickers: deprecated,
-  tts: deprecated,
-  webhookId: deprecated,
 });
 
 export const DiscordThread = {
@@ -115,15 +86,6 @@ export const Threads = Table("threads", {
   slackThreadTs: v.optional(v.string()),
   version: v.optional(v.number()),
   ...DiscordThread,
-  // Legacy fields
-  autoArchiveDuration: deprecated,
-  guild: deprecated,
-  lastMessageId: deprecated,
-  lastPinTimestamp: deprecated,
-  memberCount: deprecated,
-  messageCount: deprecated,
-  rateLimitPerUser: deprecated,
-  totalMessageSent: deprecated,
 });
 
 export const DiscordUser = {
@@ -148,11 +110,6 @@ export type DiscordUser = ObjectType<typeof DiscordUser>;
 export const Users = Table("users", {
   slackUserId: v.optional(v.string()),
   ...DiscordUser,
-  // Legacy fields
-  avatar: deprecated,
-  defaultAvatarURL: deprecated,
-  guildId: deprecated,
-  userId: deprecated,
 });
 
 export const Registrations = Table("registrations", {
