@@ -43,7 +43,7 @@ export const sendMessage = internalAction({
       threadTs,
       title,
       emojis,
-    }
+    },
   ) => {
     const web = slackClient();
     if (threadId && !threadTs && title) {
@@ -55,6 +55,8 @@ export const sendMessage = internalAction({
         // so it doesn't say Webhook URL?
         icon_url: "https://cdn.discordapp.com/embed/avatars/2.png",
         mrkdwn: true,
+        unfurl_links: false,
+        unfurl_media: false,
       });
       await runMutation(internal.slack.startedThread, {
         threadId,
@@ -68,6 +70,8 @@ export const sendMessage = internalAction({
       icon_url: author.avatarUrl,
       thread_ts: threadTs,
       mrkdwn: true,
+      unfurl_links: false,
+      unfurl_media: false,
     });
     await runMutation(internal.slack.sentMessage, {
       messageId,
@@ -80,7 +84,7 @@ function threadMessage(
   title: string,
   channelName: string,
   linkUrl?: string,
-  emojis?: string[]
+  emojis?: string[],
 ) {
   return `${title} (${channelName})\n${linkUrl ? linkUrl + " \n" : ""}${
     emojis ? emojis.join(" ") : ""
@@ -132,7 +136,7 @@ export const updateThread = internalAction({
   },
   handler: async (
     {},
-    { channel, threadTs, title, channelName, emojis, linkUrl }
+    { channel, threadTs, title, channelName, emojis, linkUrl },
   ) => {
     const web = slackClient();
     await web.chat.update({
