@@ -127,11 +127,11 @@ importers:
         specifier: ^4.17.0
         version: 4.22.1
       convex:
-        specifier: ^1.10.0
-        version: 1.10.0
+        specifier: ^1.12.1
+        version: 1.12.1
       convex-helpers:
-        specifier: 0.1.30-alpha.0
-        version: 0.1.30-alpha.0(convex@1.10.0)
+        specifier: 0.1.41
+        version: 0.1.41(convex@1.12.1)
       discord.js:
         specifier: ^14.9.0
         version: 14.14.1
@@ -1942,10 +1942,10 @@ packages:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
-  /convex-helpers@0.1.30-alpha.0(convex@1.10.0):
-    resolution: {integrity: sha512-i28+8zYwvAgoecaIEErWhXhbo8z/uZFK0Xyahdj4gu97Q1Zmn2EzmZ9q4rgY9+Tjc2s/HYjmIQyOCCzVz1C2zw==}
+  /convex-helpers@0.1.41(convex@1.12.1):
+    resolution: {integrity: sha512-RnQJOXCAujwRwjNcwzQNJZeNDMe7nKASfC3+5e05wpwg71RSrJdZnDcGlyOZ5f/E53+wnRnuYequnDjjOJWH3A==}
     peerDependencies:
-      convex: ^1.11.0
+      convex: ^1.12.0
       hono: ^4.0.5
       react: ^17.0.2 || ^18.0.0
       zod: ^3.22.4
@@ -1957,16 +1957,16 @@ packages:
       zod:
         optional: true
     dependencies:
-      convex: 1.10.0
+      convex: 1.12.1
     dev: false
 
-  /convex@1.10.0:
-    resolution: {integrity: sha512-dGU3K3z63e4JQSq4AQthgxUADux1/0qfgFBtOsolcPo+ilV2Dp5wfBJYMOvLi7wkmNvJ+b3I90XfLPGfGzQrWw==}
+  /convex@1.12.1:
+    resolution: {integrity: sha512-vZHVyyzlbXl/Vskq2GTADBzSHqFxC0THHCHHoNDBNdO/QKW50nyYwyCEmKoHjlnhuQGkfcvGYjz5uyKM0/sxVQ==}
     engines: {node: '>=16.15.1', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
-      '@clerk/clerk-react': ^4.12.8
+      '@clerk/clerk-react': ^4.12.8 || ^5.0.0
       react: ^17.0.2 || ^18.0.0
       react-dom: ^17.0.2 || ^18.0.0
     peerDependenciesMeta:
@@ -1982,6 +1982,7 @@ packages:
       esbuild: 0.17.19
       jwt-decode: 3.1.2
       node-fetch: 2.6.9
+      prettier: 3.2.5
     transitivePeerDependencies:
       - encoding
     dev: false
@@ -3754,6 +3755,12 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
     dev: true
+
+  /prettier@3.2.5:
+    resolution: {integrity: sha512-3/GWa9aOC0YeD7LUfvOG2NiDyhOWRvt1k+rcKhOuYnMY24iiCphgneUfJDyFXd6rZCAnuLBv6UeAULtrhT/F4A==}
+    engines: {node: '>=14'}
+    hasBin: true
+    dev: false
 
   /prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
