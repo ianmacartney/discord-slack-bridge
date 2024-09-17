@@ -1,5 +1,10 @@
 import { api } from "./convex/_generated/api.js";
-import { ChannelType, Client, EmbedBuilder, GatewayIntentBits } from "discord.js";
+import {
+  ChannelType,
+  Client,
+  EmbedBuilder,
+  GatewayIntentBits,
+} from "discord.js";
 import { ConvexHttpClient } from "convex/browser";
 import {
   serializeAuthor,
@@ -40,19 +45,21 @@ bot.on("threadCreate", async (thread) => {
   }
 
   try {
-    const embed = new EmbedBuilder()
-      .setColor("#d7b3cf")
-      .setTitle("Convex Support")
-      .setDescription(
-        `Thanks for building on Convex! Just a reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), please create a support ticket through your [Convex Dashboard](https://dashboard.convex.dev/) for any support requests.
+    const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
+      `**Thanks for posting in <#1088161997662724167>.**
+Just a reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), please create a support ticket through your [Convex Dashboard](https://dashboard.convex.dev/) for any support requests.
 
-For users on the Convex Starter plan, you can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can chat with <@1072591948499664996> in the <#1228095053885476985> channel.
+If you're on the Convex Starter plan, you can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can <@1072591948499664996> in the ⁠Convex Community <#1228095053885476985> channel.
+
+**Posting guidelines:**
+1. Provide context: What are you trying to achieve, what is the end-user interaction?
+1. Include full details of what you're seeing (full error message, command output, etc.)
+1. Describe what you'd like to see instead.
 
 Please note that community support is available here, and avoid tagging staff unless specifically instructed. Thank you!`,
-      );
+    );
 
     await thread.send({
-      content: "Thank you for reaching out to Convex support!",
       embeds: [embed],
     });
   } catch (error) {
@@ -87,7 +94,7 @@ bot.on("messageCreate", async (msg) => {
   console.log(
     `${args.author.username}: ${args.message.cleanContent} (${
       args.channel.id
-    }/${args.thread?.id ?? ""})`
+    }/${args.thread?.id ?? ""})`,
   );
   // Upload to Convex
   try {
