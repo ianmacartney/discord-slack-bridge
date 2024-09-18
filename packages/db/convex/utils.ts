@@ -1,5 +1,5 @@
 import { defineTable } from "convex/server";
-import { GenericId, Validator, v } from "convex/values";
+import { GenericId, GenericValidator, VId, v } from "convex/values";
 
 /**
  *
@@ -14,13 +14,13 @@ import { GenericId, Validator, v } from "convex/values";
  * }
  */
 export function Table<
-  T extends Record<string, Validator<any, any, any>>,
-  TableName extends string
+  T extends Record<string, GenericValidator>,
+  TableName extends string,
 >(name: TableName, fields: T) {
   const table = defineTable(fields);
   const withSystemFields = {
     ...fields,
-    _id: v.id(name) as Validator<GenericId<TableName>>,
+    _id: v.id(name) as VId<GenericId<TableName>>,
     _creationTime: v.number(),
   };
   return {
