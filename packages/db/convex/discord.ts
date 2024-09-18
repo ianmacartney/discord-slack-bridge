@@ -30,6 +30,7 @@ const getOrCreate = async <TableName extends DiscordRelatedTables>(
     .withIndex("id", (q) => q.eq("id", doc.id as any))
     .unique();
   if (existing) {
+    // TODO: update fields if they have changed
     return existing._id;
   }
   return await db.insert(table, doc);
