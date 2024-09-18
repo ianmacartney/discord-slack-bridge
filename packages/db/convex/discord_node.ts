@@ -125,16 +125,14 @@ export const replyToSupportThread = internalAction({
 
     const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
       `**Thanks for posting in <#1088161997662724167>.**
-Just a reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), please create a support ticket through your [Convex Dashboard](https://dashboard.convex.dev/) for any support requests.
+Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
 
-You can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can post in the <#1228095053885476985> channel to get a response from <@1072591948499664996>.
+- Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
+- Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
+- Ask in the <#1228095053885476985> channel to get a response from <@1072591948499664996>.
+- Avoid tagging staff unless specifically instructed.
 
-**Posting guidelines:**
-1. Provide context: What are you trying to achieve, what is the end-user interaction?
-1. Include full details of what you're seeing (full error message, command output, etc.)
-1. Describe what you'd like to see instead.
-
-Please note that community support is available here, and avoid tagging staff unless specifically instructed. Thank you!`,
+Thank you!`,
     );
 
     await thread.send({
