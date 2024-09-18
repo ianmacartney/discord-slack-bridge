@@ -145,7 +145,7 @@ export const receiveMessage = apiMutation({
     if (
       dbThread &&
       message.id === dbThread.id &&
-      channel.name === "support-community"
+      channel.id === process.env.AUTO_REPLY_CHANNEL_ID
     ) {
       await ctx.scheduler.runAfter(
         0,
