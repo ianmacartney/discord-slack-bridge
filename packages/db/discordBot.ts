@@ -1,5 +1,11 @@
 import { ConvexHttpClient } from "convex/browser";
-import { ChannelType, Client, GatewayIntentBits } from "discord.js";
+import {
+  ButtonStyle,
+  ChannelType,
+  Client,
+  ComponentType,
+  GatewayIntentBits,
+} from "discord.js";
 import { api } from "./convex/_generated/api.js";
 import {
   serializeAuthor,
@@ -109,9 +115,79 @@ bot.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
-    await convex.action(api.discord_node.resolveThread, {
-      discordThreadId: interaction.channelId,
-    });
+    try {
+      // Update button to in-progress state.
+      await interaction.update({
+        components: [
+          {
+            type: ComponentType.ActionRow,
+            components: [
+              {
+                type: ComponentType.Button,
+                label: "Working on it...",
+                style: ButtonStyle.Secondary,
+                customId: "resolveThread",
+                disabled: true,
+              },
+            ],
+          },
+        ],
+      });
+
+      // Mark the thread as resolved.
+      await convex.action(api.discord_node.resolveThread, {
+        discordThreadId: interaction.channelId,
+      });
+
+      // Update button to resolved state.
+      await interaction.editReply({
+        components: [
+          {
+            type: ComponentType.ActionRow,
+            components: [
+              {
+                type: ComponentType.Button,
+                label: "Resolved!",
+                style: ButtonStyle.Success,
+                customId: "resolveThread",
+                disabled: true,
+              },
+            ],
+          },
+        ],
+      });
+
+      // Send a follow-up message to the user who clicked the button.
+      await interaction.followUp({
+        content: "Marked as resolved! Thanks for letting us know.",
+        ephemeral: true,
+      });
+    } catch (error) {
+      console.error("Error resolving thread:", error);
+      // Revert to original state on error.
+      await interaction.editReply({
+        components: [
+          {
+            type: ComponentType.ActionRow,
+            components: [
+              {
+                type: ComponentType.Button,
+                label: "Mark as resolved",
+                style: ButtonStyle.Primary,
+                customId: "resolveThread",
+                disabled: false,
+              },
+            ],
+          },
+        ],
+      });
+
+      // Send error message as a follow-up.
+      await interaction.followUp({
+        content: "Failed to resolve thread. Please try again later.",
+        ephemeral: true,
+      });
+    }
   }
 });
 
