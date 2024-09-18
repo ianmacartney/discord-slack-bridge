@@ -1,16 +1,16 @@
 import {
   cancelMigration,
   getStatus,
-  // makeMigration,
+  makeMigration,
   startMigrationsSerially,
 } from "convex-helpers/server/migrations";
 import { internalMutation, internalQuery } from "./_generated/server";
-// import { internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
-// const migration = makeMigration(internalMutation, {
-//   migrationTable: "migrations",
-// });
+const migration = makeMigration(internalMutation, {
+  migrationTable: "migrations",
+});
 
 // export const deleteDeprecatedUserFields = migration({
 //   table: "users",
