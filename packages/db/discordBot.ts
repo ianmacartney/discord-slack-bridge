@@ -1,6 +1,6 @@
-import { api } from "./convex/_generated/api.js";
-import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 import { ConvexHttpClient } from "convex/browser";
+import { ChannelType, Client, GatewayIntentBits } from "discord.js";
+import { api } from "./convex/_generated/api.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -104,10 +104,14 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
 });
 
 bot.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  if (interaction.commandName === "ping") {
+  if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
     await interaction.reply("Pong!");
+  }
+
+  if (interaction.isButton() && interaction.customId === "resolveThread") {
+    await convex.action(api.discord_node.resolveThread, {
+      discordThreadId: interaction.channelId,
+    });
   }
 });
 
