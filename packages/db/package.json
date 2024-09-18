@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
-    "build": "tsc",
+    "build": "tsc --noUnusedLocals false",
     "prebuild": "rm -rf dist",
     "discordBot": "npm run build && node dist/discordBot.js",
     "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
