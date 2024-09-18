@@ -49,7 +49,7 @@ bot.on("threadCreate", async (thread) => {
       `**Thanks for posting in <#1088161997662724167>.**
 Just a reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), please create a support ticket through your [Convex Dashboard](https://dashboard.convex.dev/) for any support requests.
 
-If you're on the Convex Starter plan, you can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can <@1072591948499664996> in the ⁠Convex Community <#1228095053885476985> channel.
+You can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can <@1072591948499664996> in the ⁠Convex Community <#1228095053885476985> channel.
 
 **Posting guidelines:**
 1. Provide context: What are you trying to achieve, what is the end-user interaction?
