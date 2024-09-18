@@ -28,6 +28,9 @@ const bot = new Client({
 
 bot.on("ready", () => {
   console.log(`Logged in as ${bot.user?.tag}!`);
+  console.log(
+    `Bot is in ${bot.guilds.cache.size} guilds: ${bot.guilds.cache.map((guild) => guild.name).join(", ")}`,
+  );
 });
 
 bot.on("messageCreate", async (msg) => {
@@ -54,7 +57,7 @@ bot.on("messageCreate", async (msg) => {
   console.log(
     `${args.author.username}: ${args.message.cleanContent} (${
       args.channel.id
-    }/${args.thread?.id ?? ""})`
+    }/${args.thread?.id ?? ""})`,
   );
   // Upload to Convex
   try {
