@@ -1,6 +1,9 @@
 "use node";
 import { v } from "convex/values";
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   Client,
   EmbedBuilder,
@@ -14,7 +17,7 @@ import {
 } from "../shared/discordUtils";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { internalAction } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { DiscordMessage, DiscordUser } from "./schema";
 
 const discordClient = async () => {
@@ -135,8 +138,36 @@ Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), us
 Thank you!`,
     );
 
+    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId("resolveThread")
+        .setLabel("Mark as resolved")
+        .setStyle(ButtonStyle.Success),
+    );
+
     await thread.send({
       embeds: [embed],
+      components: [actionRow],
+    });
+  },
+});
+
+export const resolveThread = action({
+  args: {
+    discordThreadId: v.string(),
+  },
+  handler: async (ctx, { discordThreadId }) => {
+    const thread = await ctx.runQuery(
+      internal.discord.getThreadByDiscordThreadId,
+      {
+        discordThreadId,
+      },
+    );
+    if (!thread) {
+      throw new Error(`Thread ${discordThreadId} not found in database`);
+    }
+    await ctx.runMutation(internal.discord.resolveThread, {
+      threadId: thread._id,
     });
   },
 });
