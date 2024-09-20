@@ -130,9 +130,6 @@ export const receiveMessage = apiMutation({
       threadId = await getOrCreate(ctx.db, "threads", { ...thread, channelId });
       await touchThread(ctx, { threadId });
       dbThread = (await ctx.db.get(threadId))!;
-      if (shouldCreateTicketForDiscordThread(dbChannel)) {
-        await createTicket(ctx, dbThread._id);
-      }
     }
     const messageId = await getOrCreate(ctx.db, "messages", {
       ...message,
