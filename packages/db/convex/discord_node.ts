@@ -129,7 +129,7 @@ Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), us
 
 - Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
 - Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
-- Ask in the <#1228095053885476985> channel to get a response from <@1072591948499664996>.
+- Additionally, you can post your questions in the Convex Community's <#1228095053885476985> channel to receive a response from AI.
 - Avoid tagging staff unless specifically instructed.
 
 Thank you!`,
