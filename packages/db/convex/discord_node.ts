@@ -109,51 +109,6 @@ export const replyFromSlack = internalAction({
   },
 });
 
-// TODO: Do this from discordBot.ts so the response is faster.
-export const replyToSupportThread = internalAction({
-  args: {
-    threadId: v.string(),
-  },
-  handler: async ({}, { threadId }) => {
-    const bot = await discordClient();
-
-    const thread = await bot.channels.fetch(threadId);
-    if (!thread) {
-      throw new Error(`Thread ${threadId} not found`);
-    }
-    if (
-      thread.type !== ChannelType.PublicThread &&
-      thread.type !== ChannelType.PrivateThread
-    ) {
-      throw new Error("Can only reply to threads");
-    }
-
-    const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
-      `**Thanks for posting in <#1088161997662724167>.**
-Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
-
-- Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
-- Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
-- Additionally, you can post your questions in the Convex Community's <#1228095053885476985> channel to receive a response from AI.
-- Avoid tagging staff unless specifically instructed.
-
-Thank you!`,
-    );
-
-    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId("resolveThread")
-        .setLabel("Mark as resolved")
-        .setStyle(ButtonStyle.Success),
-    );
-
-    await thread.send({
-      embeds: [embed],
-      components: [actionRow],
-    });
-  },
-});
-
 export const applyTags = internalAction({
   args: {
     threadId: v.string(),
