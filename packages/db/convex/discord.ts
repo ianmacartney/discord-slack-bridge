@@ -139,22 +139,6 @@ export const receiveMessage = apiMutation({
       threadId,
     });
 
-    // If it's a new thread (where the message and thread IDs match) in the
-    // #support-community channel, send an auto-reply.
-    if (
-      dbThread &&
-      message.id === dbThread.id &&
-      channel.id === process.env.AUTO_REPLY_CHANNEL_ID
-    ) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.discord_node.replyToSupportThread,
-        {
-          threadId: dbThread.id,
-        },
-      );
-    }
-
     // If the message is in a channel with an associated Slack channel, forward
     // it to that Slack channel.
     //
