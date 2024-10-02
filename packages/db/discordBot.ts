@@ -116,31 +116,26 @@ bot.on("interactionCreate", async (interaction) => {
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
     try {
-      // Update button to in-progress state.
-      await interaction.update({
-        components: [
-          {
-            type: ComponentType.ActionRow,
-            components: [
-              {
-                type: ComponentType.Button,
-                label: "Working on it...",
-                style: ButtonStyle.Secondary,
-                customId: "resolveThread",
-                disabled: true,
-              },
-            ],
-          },
-        ],
-      });
+      const thread = await bot.channels.fetch(interaction.channelId);
+      if (!thread?.isThread()) {
+        throw new Error("Failed to fetch thread to resolve.");
+      }
 
-      // Mark the thread as resolved.
-      await convex.action(api.discord_node.resolveThread, {
-        discordThreadId: interaction.channelId,
-      });
+      const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
+      if (!resolvedTagId) {
+        throw new Error(
+          "DISCORD_RESOLVED_TAG_ID environment variable is not set.",
+        );
+      }
+
+      // Add the 'resolved' tag to the thread.
+      const currentTags = thread.appliedTags;
+      if (!currentTags.includes(resolvedTagId)) {
+        await thread.setAppliedTags([...currentTags, resolvedTagId]);
+      }
 
       // Update button to resolved state.
-      await interaction.editReply({
+      await interaction.update({
         components: [
           {
             type: ComponentType.ActionRow,
@@ -156,16 +151,17 @@ bot.on("interactionCreate", async (interaction) => {
           },
         ],
       });
-
-      // Send a follow-up message to the user who clicked the button.
-      await interaction.followUp({
-        content: "Marked as resolved! Thanks for letting us know.",
-        ephemeral: true,
-      });
     } catch (error) {
       console.error("Error resolving thread:", error);
-      // Revert to original state on error.
-      await interaction.editReply({
+
+      // Send error message to indicate it failed to resolve.
+      await interaction.followUp({
+        content: "Failed to resolve thread. Please try again later.",
+        ephemeral: true,
+      });
+
+      // Revert to original state so the user can try again.
+      await interaction.update({
         components: [
           {
             type: ComponentType.ActionRow,
@@ -180,12 +176,6 @@ bot.on("interactionCreate", async (interaction) => {
             ],
           },
         ],
-      });
-
-      // Send error message as a follow-up.
-      await interaction.followUp({
-        content: "Failed to resolve thread. Please try again later.",
-        ephemeral: true,
       });
     }
   }

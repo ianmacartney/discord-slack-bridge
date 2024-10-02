@@ -1,4 +1,5 @@
 "use node";
+
 import { v } from "convex/values";
 import {
   ActionRowBuilder,
@@ -108,6 +109,7 @@ export const replyFromSlack = internalAction({
   },
 });
 
+// TODO: Do this from discordBot.ts so the response is faster.
 export const replyToSupportThread = internalAction({
   args: {
     threadId: v.string(),
@@ -148,26 +150,6 @@ Thank you!`,
     await thread.send({
       embeds: [embed],
       components: [actionRow],
-    });
-  },
-});
-
-export const resolveThread = action({
-  args: {
-    discordThreadId: v.string(),
-  },
-  handler: async (ctx, { discordThreadId }) => {
-    const thread = await ctx.runQuery(
-      internal.discord.getThreadByDiscordThreadId,
-      {
-        discordThreadId,
-      },
-    );
-    if (!thread) {
-      throw new Error(`Thread ${discordThreadId} not found in database`);
-    }
-    await ctx.runMutation(internal.discord.resolveThread, {
-      threadId: thread._id,
     });
   },
 });
