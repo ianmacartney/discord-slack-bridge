@@ -1,21 +1,22 @@
-import { internal } from "./_generated/api";
 import { WithoutSystemFields } from "convex/server";
+import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import {
-  mutation,
-  internalMutation,
-  DatabaseWriter,
-  MutationCtx,
   DatabaseReader,
+  DatabaseWriter,
+  internalMutation,
+  internalQuery,
+  mutation,
+  MutationCtx,
 } from "./_generated/server";
-import {
-  DiscordThread,
-  DiscordMessage,
-  DiscordUser,
-  DiscordChannel,
-} from "./schema";
-import { v } from "convex/values";
 import { apiMutation } from "./apiFunctions";
+import {
+  DiscordChannel,
+  DiscordMessage,
+  DiscordThread,
+  DiscordUser,
+} from "./schema";
 import { createTicket, shouldCreateTicketForDiscordThread } from "./tickets";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
@@ -137,22 +138,6 @@ export const receiveMessage = apiMutation({
       channelId,
       threadId,
     });
-
-    // If it's a new thread (where the message and thread IDs match) in the
-    // #support-community channel, send an auto-reply.
-    if (
-      dbThread &&
-      message.id === dbThread.id &&
-      channel.id === process.env.AUTO_REPLY_CHANNEL_ID
-    ) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.discord_node.replyToSupportThread,
-        {
-          threadId: dbThread.id,
-        },
-      );
-    }
 
     // If the message is in a channel with an associated Slack channel, forward
     // it to that Slack channel.
@@ -336,8 +321,9 @@ export const refreshThreads = internalMutation({
   },
 });
 
-// TODO: make generic and look up dynamically
-const ResolvedTagId = "1088163249410818230";
+const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
+if (!resolvedTagId)
+  throw new Error("Specify DISCORD_RESOLVED_TAG_ID as an env variable");
 
 export const resolveThread = internalMutation({
   args: {
@@ -348,7 +334,7 @@ export const resolveThread = internalMutation({
     if (!thread) {
       throw "Not a thread";
     }
-    if (thread.appliedTags.indexOf(ResolvedTagId) !== -1) {
+    if (thread.appliedTags.indexOf(resolvedTagId) !== -1) {
       console.log("Tag already applied, refusing to apply");
       return;
     }
@@ -357,11 +343,11 @@ export const resolveThread = internalMutation({
     }
     const channel = await db.get(thread.channelId);
     if (!channel) throw new Error("Channel not found:" + thread.channelId);
-    if (!channel.availableTags?.find((t) => t.id === ResolvedTagId)) {
+    if (!channel.availableTags?.find((t) => t.id === resolvedTagId)) {
       console.log("Tag not found, refusing to apply");
       return;
     }
-    const tags = [...thread.appliedTags, ResolvedTagId];
+    const tags = [...thread.appliedTags, resolvedTagId];
     await db.patch(threadId, {
       appliedTags: tags,
     });
@@ -370,5 +356,17 @@ export const resolveThread = internalMutation({
       threadId: thread.id,
       tags,
     });
+  },
+});
+
+export const getThreadByDiscordThreadId = internalQuery({
+  args: {
+    discordThreadId: v.string(),
+  },
+  handler: async ({ db }, { discordThreadId }) => {
+    return await db
+      .query("threads")
+      .withIndex("id", (q) => q.eq("id", discordThreadId))
+      .unique();
   },
 });

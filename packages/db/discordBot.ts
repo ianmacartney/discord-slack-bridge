@@ -1,6 +1,15 @@
-import { api } from "./convex/_generated/api.js";
-import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 import { ConvexHttpClient } from "convex/browser";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  Client,
+  ComponentType,
+  EmbedBuilder,
+  GatewayIntentBits,
+} from "discord.js";
+import { api } from "./convex/_generated/api.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -89,6 +98,45 @@ bot.on("messageDelete", async (msg) => {
   }
 });
 
+bot.on("threadCreate", async (thread) => {
+  const autoReplyChannelId = process.env.AUTO_REPLY_CHANNEL_ID;
+  if (!autoReplyChannelId) {
+    throw new Error("AUTO_REPLY_CHANNEL_ID environment variable is not set.");
+  }
+
+  if (thread.parentId === autoReplyChannelId) {
+    try {
+      const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
+        `**Thanks for posting in <#1088161997662724167>.**
+        Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
+        
+        - Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
+        - Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
+        - Additionally, you can post your questions in the Convex Community's <#1228095053885476985> channel to receive a response from AI.
+        - Avoid tagging staff unless specifically instructed.
+        
+        Thank you!`,
+      );
+
+      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("resolveThread")
+          .setLabel("Mark as resolved")
+          .setStyle(ButtonStyle.Success),
+      );
+
+      await thread.send({
+        embeds: [embed],
+        components: [actionRow],
+      });
+
+      console.log(`Auto-reply sent to new support thread: ${thread.id}`);
+    } catch (error) {
+      console.error(`Failed to send auto-reply to thread ${thread.id}:`, error);
+    }
+  }
+});
+
 bot.on("threadUpdate", async (oldThread, newThread) => {
   const args = {
     previous: serializeThread(oldThread),
@@ -104,10 +152,74 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
 });
 
 bot.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  if (interaction.commandName === "ping") {
+  if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
     await interaction.reply("Pong!");
+  }
+
+  if (interaction.isButton() && interaction.customId === "resolveThread") {
+    try {
+      const thread = await bot.channels.fetch(interaction.channelId);
+      if (!thread?.isThread()) {
+        throw new Error("Failed to fetch thread to resolve.");
+      }
+
+      const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
+      if (!resolvedTagId) {
+        throw new Error(
+          "DISCORD_RESOLVED_TAG_ID environment variable is not set.",
+        );
+      }
+
+      // Add the 'resolved' tag to the thread.
+      const currentTags = thread.appliedTags;
+      if (!currentTags.includes(resolvedTagId)) {
+        await thread.setAppliedTags([...currentTags, resolvedTagId]);
+      }
+
+      // Update button to resolved state.
+      await interaction.update({
+        components: [
+          {
+            type: ComponentType.ActionRow,
+            components: [
+              {
+                type: ComponentType.Button,
+                label: "Resolved!",
+                style: ButtonStyle.Success,
+                customId: "resolveThread",
+                disabled: true,
+              },
+            ],
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Error resolving thread:", error);
+
+      // Send error message to indicate it failed to resolve.
+      await interaction.followUp({
+        content: "Failed to resolve thread. Please try again later.",
+        ephemeral: true,
+      });
+
+      // Revert to original state so the user can try again.
+      await interaction.update({
+        components: [
+          {
+            type: ComponentType.ActionRow,
+            components: [
+              {
+                type: ComponentType.Button,
+                label: "Mark as resolved",
+                style: ButtonStyle.Primary,
+                customId: "resolveThread",
+                disabled: false,
+              },
+            ],
+          },
+        ],
+      });
+    }
   }
 });
 
