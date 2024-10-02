@@ -1,9 +1,12 @@
 import { ConvexHttpClient } from "convex/browser";
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
   ButtonStyle,
   ChannelType,
   Client,
   ComponentType,
+  EmbedBuilder,
   GatewayIntentBits,
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
@@ -92,6 +95,47 @@ bot.on("messageDelete", async (msg) => {
     await convex.mutation(api.discord.deleteMessage, { id: msg.id, apiToken });
   } catch (e) {
     console.error(e);
+  }
+});
+
+bot.on("threadCreate", async (thread) => {
+  const autoReplyChannelId = process.env.AUTO_REPLY_CHANNEL_ID;
+  if (!autoReplyChannelId) {
+    throw new Error("AUTO_REPLY_CHANNEL_ID environment variable is not set.");
+  }
+
+  if (thread.parentId === autoReplyChannelId) {
+    try {
+      const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
+        `**Thanks for posting in <#1088161997662724167>.**
+Just a reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), please create a support ticket through your [Convex Dashboard](https://dashboard.convex.dev/) for any support requests.
+
+You can search for answers using [search.convex.dev](https://search.convex.dev), which covers docs, Stack, and Discord. Additionally, you can post in the <#1228095053885476985> channel to get a response from <@1072591948499664996>.
+
+**Posting guidelines:**
+1. Provide context: What are you trying to achieve, what is the end-user interaction?
+1. Include full details of what you're seeing (full error message, command output, etc.)
+1. Describe what you'd like to see instead.
+
+Please note that community support is available here, and avoid tagging staff unless specifically instructed. Thank you!`,
+      );
+
+      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("resolveThread")
+          .setLabel("Mark as resolved")
+          .setStyle(ButtonStyle.Success),
+      );
+
+      await thread.send({
+        embeds: [embed],
+        components: [actionRow],
+      });
+
+      console.log(`Auto-reply sent to new support thread: ${thread.id}`);
+    } catch (error) {
+      console.error(`Failed to send auto-reply to thread ${thread.id}:`, error);
+    }
   }
 });
 
