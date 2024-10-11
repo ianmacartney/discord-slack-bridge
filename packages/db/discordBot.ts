@@ -1,9 +1,12 @@
 import { ConvexHttpClient } from "convex/browser";
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
   ButtonStyle,
   ChannelType,
   Client,
   ComponentType,
+  EmbedBuilder,
   GatewayIntentBits,
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
@@ -92,6 +95,45 @@ bot.on("messageDelete", async (msg) => {
     await convex.mutation(api.discord.deleteMessage, { id: msg.id, apiToken });
   } catch (e) {
     console.error(e);
+  }
+});
+
+bot.on("threadCreate", async (thread) => {
+  const autoReplyChannelId = process.env.AUTO_REPLY_CHANNEL_ID;
+  if (!autoReplyChannelId) {
+    throw new Error("AUTO_REPLY_CHANNEL_ID environment variable is not set.");
+  }
+
+  if (thread.parentId === autoReplyChannelId) {
+    try {
+      const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
+        `**Thanks for posting in <#1088161997662724167>.**
+        Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
+
+        - Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
+        - Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
+        - Additionally, you can post your questions in the Convex Community's <#1228095053885476985> channel to receive a response from AI.
+        - Avoid tagging staff unless specifically instructed.
+
+        Thank you!`,
+      );
+
+      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("resolveThread")
+          .setLabel("Mark as resolved")
+          .setStyle(ButtonStyle.Success),
+      );
+
+      await thread.send({
+        embeds: [embed],
+        components: [actionRow],
+      });
+
+      console.log(`Auto-reply sent to new support thread: ${thread.id}`);
+    } catch (error) {
+      console.error(`Failed to send auto-reply to thread ${thread.id}:`, error);
+    }
   }
 });
 
