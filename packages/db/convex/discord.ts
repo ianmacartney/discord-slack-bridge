@@ -316,6 +316,32 @@ export const updateThread = apiMutation({
   },
 });
 
+export const deleteThread = apiMutation({
+  args: { id: v.string() },
+  handler: async ({ db, scheduler }, { id }) => {
+    const existing = await db
+      .query("threads")
+      .withIndex("id", (q) => q.eq("id", id))
+      .unique();
+    if (!existing) return;
+    await db.patch(existing._id, { archived: true });
+    const channel = await db.get(existing.channelId);
+    if (!channel) throw new Error("Channel not found:" + existing.channelId);
+    if (channel.slackChannelId && existing.slackThreadTs) {
+      // For now let's keep it around but just mark it as archived.
+      await scheduler.runAfter(
+        0,
+        internal.slack_node.updateThread,
+        threadSlackParams(channel, { ...existing, archived: true }),
+      );
+      //   await scheduler.runAfter(0, internal.slack_node.deleteMessage, {
+      //     messageTs: existing.slackThreadTs,
+      //     channel: channel.slackChannelId,
+      //   });
+    }
+  },
+});
+
 // To refresh the info of all threads, if we change the format e.g.
 export const refreshThreads = internalMutation({
   args: {},

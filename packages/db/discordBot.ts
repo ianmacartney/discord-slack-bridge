@@ -109,6 +109,18 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
   }
 });
 
+bot.on("threadDelete", async (thread) => {
+  console.log("delete thread " + thread.id);
+  try {
+    await convex.mutation(api.discord.deleteThread, {
+      id: thread.id,
+      apiToken,
+    });
+  } catch (e) {
+    console.error(e);
+  }
+});
+
 bot.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
     await interaction.reply("Pong!");
