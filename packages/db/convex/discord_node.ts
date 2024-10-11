@@ -1,15 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ChannelType,
-  Client,
-  EmbedBuilder,
-  GatewayIntentBits,
-} from "discord.js";
+import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -18,7 +10,7 @@ import {
 } from "../shared/discordUtils";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { action, internalAction } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { DiscordMessage, DiscordUser } from "./schema";
 
 const discordClient = async () => {
