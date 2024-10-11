@@ -109,12 +109,12 @@ bot.on("threadCreate", async (thread) => {
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
         Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
-        
+
         - Provide context: What are you trying to achieve, what is the end-user interaction, what are you seeing? (full error message, command output, etc.)
         - Use [search.convex.dev](https://search.convex.dev) to search Docs, Stack, and Discord all at once.
         - Additionally, you can post your questions in the Convex Community's <#1228095053885476985> channel to receive a response from AI.
         - Avoid tagging staff unless specifically instructed.
-        
+
         Thank you!`,
       );
 
@@ -146,6 +146,18 @@ bot.on("threadUpdate", async (oldThread, newThread) => {
   console.log("update thread " + newThread.id);
   try {
     await convex.mutation(api.discord.updateThread, args);
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+bot.on("threadDelete", async (thread) => {
+  console.log("delete thread " + thread.id);
+  try {
+    await convex.mutation(api.discord.deleteThread, {
+      id: thread.id,
+      apiToken,
+    });
   } catch (e) {
     console.error(e);
   }

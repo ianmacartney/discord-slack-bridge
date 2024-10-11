@@ -59,9 +59,10 @@ npm run clean && npm run build
 2. Deploy it the first time with `fly launch`, then `fly deploy` after.
 
 3. Set the environment variables for it with:
-   flyctl secrets set DISCORD_TOKEN=<discord-token>
-   flyctl secrets set CONVEX_URL=<deployment-URL>
-   flyctl secrets set CONVEX_API_TOKEN=<shared-token>
+   fly secrets set DISCORD_TOKEN=<discord-token>
+   fly secrets set CONVEX_URL=<deployment-URL>
+   fly secrets set CONVEX_API_TOKEN=<shared-token>
+   fly secrets set DISCORD_RESOLVED_TAG_ID=<resolved-tag-id>
 
 I just chose one instance in sjc, on the smallest (free) tier.
 I did have to enter my CC info, but it hasn't been charged.
