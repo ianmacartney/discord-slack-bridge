@@ -1,26 +1,19 @@
-# fly.toml file generated for bitter-water-8033 on 2023-04-03T22:42:26-07:00
+# fly.toml app configuration file generated for discord-slack-bridge on 2024-10-10T19:20:14-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "bitter-water-8033"
-kill_signal = "SIGINT"
-kill_timeout = 5
-mounts = []
-primary_region = "sjc"
-processes = []
+app = 'discord-slack-bridge'
+primary_region = 'iad'
+
+[build]
 
 [[services]]
   internal_port = 8080
   processes = ["app"]
   protocol = "tcp"
-  [services.concurrency]
-    hard_limit = 25
-    soft_limit = 20
-    type = "connections"
 
-  [[services.ports]]
-    force_https = true
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
