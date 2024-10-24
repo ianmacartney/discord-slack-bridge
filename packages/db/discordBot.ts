@@ -176,6 +176,20 @@ bot.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
+    let [button, revertButton] = [
+      {
+        label: "Mark as unresolved",
+        style: ButtonStyle.Secondary as
+          | ButtonStyle.Primary
+          | ButtonStyle.Secondary,
+      },
+      {
+        label: "Mark as resolved",
+        style: ButtonStyle.Primary as
+          | ButtonStyle.Primary
+          | ButtonStyle.Secondary,
+      },
+    ];
     try {
       const thread = await bot.channels.fetch(interaction.channelId);
       if (!thread?.isThread()) {
@@ -195,7 +209,12 @@ bot.on("interactionCreate", async (interaction) => {
 
       // Add the 'resolved' tag to the thread.
       const currentTags = thread.appliedTags;
-      if (!currentTags.includes(resolvedTagId)) {
+      if (currentTags.includes(resolvedTagId)) {
+        await thread.setAppliedTags(
+          currentTags.filter((tag) => tag !== resolvedTagId),
+        );
+        [button, revertButton] = [revertButton, button];
+      } else {
         await thread.setAppliedTags([...currentTags, resolvedTagId]);
       }
 
@@ -206,11 +225,10 @@ bot.on("interactionCreate", async (interaction) => {
             type: ComponentType.ActionRow,
             components: [
               {
-                type: ComponentType.Button,
-                label: "Resolved!",
-                style: ButtonStyle.Success,
                 customId: "resolveThread",
-                disabled: true,
+                type: ComponentType.Button,
+                disabled: false,
+                ...button,
               },
             ],
           },
@@ -232,11 +250,10 @@ bot.on("interactionCreate", async (interaction) => {
             type: ComponentType.ActionRow,
             components: [
               {
-                type: ComponentType.Button,
-                label: "Mark as resolved",
-                style: ButtonStyle.Primary,
                 customId: "resolveThread",
+                type: ComponentType.Button,
                 disabled: false,
+                ...revertButton,
               },
             ],
           },
