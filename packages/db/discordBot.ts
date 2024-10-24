@@ -21,6 +21,18 @@ import {
 const apiToken = process.env.CONVEX_API_TOKEN;
 if (!apiToken) throw new Error("Specify CONVEX_API_TOKEN as an env variable");
 
+const autoReplyChannelId = process.env.AUTO_REPLY_CHANNEL_ID;
+const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
+if (!autoReplyChannelId) {
+  console.error(
+    "AUTO_REPLY_CHANNEL_ID environment variable is not set: not replying.",
+  );
+} else {
+  if (!resolvedTagId) {
+    throw new Error("DISCORD_RESOLVED_TAG_ID environment variable is not set.");
+  }
+}
+
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");
 console.log(`Server address: ${deploymentUrl}`);
@@ -99,12 +111,7 @@ bot.on("messageDelete", async (msg) => {
 });
 
 bot.on("threadCreate", async (thread) => {
-  const autoReplyChannelId = process.env.AUTO_REPLY_CHANNEL_ID;
-  if (!autoReplyChannelId) {
-    throw new Error("AUTO_REPLY_CHANNEL_ID environment variable is not set.");
-  }
-
-  if (thread.parentId === autoReplyChannelId) {
+  if (autoReplyChannelId && thread.parentId === autoReplyChannelId) {
     try {
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
@@ -172,10 +179,14 @@ bot.on("interactionCreate", async (interaction) => {
     try {
       const thread = await bot.channels.fetch(interaction.channelId);
       if (!thread?.isThread()) {
-        throw new Error("Failed to fetch thread to resolve.");
+        console.error(
+          "Failed to fetch thread to resolve.",
+          interaction.channelId,
+          thread?.type,
+        );
+        return;
       }
 
-      const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
       if (!resolvedTagId) {
         throw new Error(
           "DISCORD_RESOLVED_TAG_ID environment variable is not set.",
