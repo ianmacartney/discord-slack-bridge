@@ -42,6 +42,8 @@ pnpm i
 export DISCORD_TOKEN=<discord-token>
 export CONVEX_URL=<deployment-URL-from-.env.local>
 export CONVEX_API_TOKEN=<some-shared-secret>
+export AUTO_REPLY_CHANNEL_ID=1088161997662724167 # for us in prod rn
+export DISCORD_RESOLVED_TAG_ID=1088163249410818230 # for us in prod rn
 npm run discordBot
 ```
 
@@ -56,12 +58,14 @@ npm run clean && npm run build
 **Deploy the discordBot.js to fly.io:**
 
 1. Install flyctl, e.g. `brew install flyctl`
-2. Deploy it the first time with `fly launch`, then `fly deploy` after.
+2. Build it with `npm run build`!
+3. Deploy it the first time with `fly launch`, then `fly deploy` after.
 
-3. Set the environment variables for it with:
+4. Set the environment variables for it with:
    fly secrets set DISCORD_TOKEN=<discord-token>
    fly secrets set CONVEX_URL=<deployment-URL>
    fly secrets set CONVEX_API_TOKEN=<shared-token>
+   fly secrets set AUTO_REPLY_CHANNEL_ID=<resolved-tag-id>
    fly secrets set DISCORD_RESOLVED_TAG_ID=<resolved-tag-id>
 
 I just chose one instance in sjc, on the smallest (free) tier.
