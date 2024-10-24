@@ -12,6 +12,7 @@ primary_region = 'iad'
   internal_port = 8080
   processes = ["app"]
   protocol = "tcp"
+  auto_stop_machines = "off"
 
 [[vm]]
   memory = '512mb'
