@@ -57,9 +57,15 @@ npm run clean && npm run build
 
 **Deploy the discordBot.js to fly.io:**
 
+Normal deploy:
+
+`npm run flyDeploy`
+
+Installation / configuration:
+
 1. Install flyctl, e.g. `brew install flyctl`
-2. Build it with `npm run build`!
-3. Deploy it the first time with `fly launch`, then `fly deploy` after.
+2. Build it with `npm run build`
+3. Deploy it the first time with `fly launch`. After first: `npm run flyDeploy`
 
 4. Set the environment variables for it with:
    fly secrets set DISCORD_TOKEN=<discord-token>

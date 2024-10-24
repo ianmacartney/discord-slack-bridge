@@ -11,6 +11,7 @@
     "discordBot": "npm run build && node dist/discordBot.js",
     "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
     "dockerBot": "docker run --init --env-file .env --rm discordbot:latest",
+    "flyDeploy": "npm run build && fly deploy",
     "setup": "convex dev --until-success"
   },
   "author": "",
