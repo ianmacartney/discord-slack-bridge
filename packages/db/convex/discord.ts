@@ -123,6 +123,12 @@ export const receiveMessage = apiMutation({
     thread: v.optional(v.object(DiscordThread)),
   },
   handler: async (ctx, { author, message, channel, thread }) => {
+    if (!message.content) {
+      // We auto-reply with a special message that doesn't show up as content.
+      // This races with the original message, causing issues with duplicate
+      // Slack threads getting started, so just skip them here.
+      return;
+    }
     const authorId = await getOrCreate(ctx.db, "users", author);
     const channelId = await getOrCreate(ctx.db, "channels", channel);
     const dbChannel = (await ctx.db.get(channelId))!;
