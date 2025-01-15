@@ -34,7 +34,7 @@ export const list = internalQuery({
   },
 });
 
-export const memberId = internalQuery({
+export const lookupAssociatedAccountIds = internalQuery({
   args: {
     displayName: v.string(),
   },
@@ -46,7 +46,7 @@ export const memberId = internalQuery({
     if (usersWithDisplayName.length === 0) {
       throw new Error("User not found");
     }
-    const memberIds = [];
+    const associatedAccountIds = [];
     for (const user of usersWithDisplayName) {
       if (!user.memberId) {
         throw new Error("User has no memberId");
@@ -54,9 +54,9 @@ export const memberId = internalQuery({
       const registrations = await ctx.db.query("registrations").withIndex("discordUserId", (q) =>
         q.eq("discordUserId", user.memberId!),
       ).collect();
-      memberIds.push(...registrations.map((r) => r.associatedAccountId));
+      associatedAccountIds.push(...registrations.map((r) => r.associatedAccountId));
     }
-    return memberIds;
+    return associatedAccountIds;
   },
 });
 
