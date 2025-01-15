@@ -34,6 +34,32 @@ export const list = internalQuery({
   },
 });
 
+export const lookupAssociatedAccountIds = internalQuery({
+  args: {
+    displayName: v.string(),
+  },
+  handler: async (ctx, { displayName }) => {
+    const users = await ctx.db.query("users").withSearchIndex("displayName", (q) =>
+      q.search("displayName", displayName),
+    ).collect();
+    const usersWithDisplayName = users.filter((u) => u.displayName === displayName);
+    if (usersWithDisplayName.length === 0) {
+      throw new Error("User not found");
+    }
+    const associatedAccountIds = [];
+    for (const user of usersWithDisplayName) {
+      if (!user.memberId) {
+        throw new Error("User has no memberId");
+      }
+      const registrations = await ctx.db.query("registrations").withIndex("discordUserId", (q) =>
+        q.eq("discordUserId", user.memberId!),
+      ).collect();
+      associatedAccountIds.push(...registrations.map((r) => r.associatedAccountId));
+    }
+    return associatedAccountIds;
+  },
+});
+
 export const addEmployees = internalMutation({
   args: { users: v.array(v.object({ id: v.id("users"), email: v.string() })) },
   handler: async (ctx, { users }) => {
