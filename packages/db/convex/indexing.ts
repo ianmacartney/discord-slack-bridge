@@ -83,7 +83,7 @@ const hydrateSearchDocument = async ({
     title: thread.name,
     objectID: thread.id,
     channel: chan.name,
-    url: `https://discord.com/channels/${thread.guildId}/${channel.id}/${thread.id}`,
+    url: `https://discord.com/channels/${thread.guildId}/${thread.id}`,
     tags,
     messages: finalMessages,
     date: thread.createdTimestamp,
