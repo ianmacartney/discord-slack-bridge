@@ -13,6 +13,7 @@ export type DiscordDocument = {
   title: string;
   date: number;
   channel: string;
+  url: string;
   messages: {
     author: {
       name: string;
@@ -38,6 +39,13 @@ const hydrateSearchDocument = async ({
   if (!chan.include) {
     return null; // This channel is not being indexed for search.
   }
+
+  // Get the actual channel object to access the Discord channel ID.
+  const channel = await db.get(thread.channelId);
+  if (!channel) {
+    return null;
+  }
+
   var tags = [];
   for (const tag of thread.appliedTags) {
     const tagName: string | null = chan.tagMap.get(tag) ?? null;
@@ -75,6 +83,7 @@ const hydrateSearchDocument = async ({
     title: thread.name,
     objectID: thread.id,
     channel: chan.name,
+    url: `https://discord.com/channels/${channel.id}/${thread.id}`,
     tags,
     messages: finalMessages,
     date: thread.createdTimestamp,
@@ -138,13 +147,13 @@ export const updatedSearchDocuments = query(
       documents: hydratedBatch,
       position: newThreadBatch[newThreadBatch.length - 1].version!,
     };
-  }
+  },
 );
 
 export const setSearchIndex = mutation(
   async (
     { db }: { db: DatabaseWriter },
-    { position }: { position: number }
+    { position }: { position: number },
   ): Promise<void> => {
     const existing = await db.query("threadSearchStatus").first();
     if (existing == null) {
@@ -152,5 +161,5 @@ export const setSearchIndex = mutation(
     } else {
       await db.patch(existing._id, { indexedCursor: position });
     }
-  }
+  },
 );
