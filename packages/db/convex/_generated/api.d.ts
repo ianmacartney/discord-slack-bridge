@@ -1,5 +1,3 @@
-/* prettier-ignore-start */
-
 /* eslint-disable */
 /**
  * Generated `api` utility.
@@ -10,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as algolia from "../algolia.js";
 import type * as apiFunctions from "../apiFunctions.js";
 import type * as crons from "../crons.js";
@@ -31,14 +24,12 @@ import type * as utils from "../utils.js";
 import type * as verification from "../verification.js";
 import type * as verification_node from "../verification_node.js";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
 declare const fullApi: ApiFromModules<{
   algolia: typeof algolia;
   apiFunctions: typeof apiFunctions;
@@ -56,13 +47,31 @@ declare const fullApi: ApiFromModules<{
   verification: typeof verification;
   verification_node: typeof verification_node;
 }>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
 
-/* prettier-ignore-end */
+export declare const components: {};
