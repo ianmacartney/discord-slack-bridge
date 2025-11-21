@@ -11,7 +11,6 @@ import {
 import { DiscordChannel } from "./schema";
 import { paginationOptsValidator } from "convex/server";
 import { asyncMap } from "convex-helpers";
-import { resolveThread } from "./discord";
 import { isEmployeeEmail } from "./users";
 
 export function shouldCreateTicketForDiscordThread(thread: DiscordChannel) {

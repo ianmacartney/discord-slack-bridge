@@ -47,7 +47,7 @@ const bot = new Client({
   ],
 });
 
-bot.on("ready", () => {
+bot.on("clientReady", () => {
   console.log(`Logged in as ${bot.user?.tag}!`);
   console.log(
     `Bot is in ${bot.guilds.cache.size} guilds: ${bot.guilds.cache.map((guild) => guild.name).join(", ")}`,
