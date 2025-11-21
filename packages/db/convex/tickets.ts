@@ -119,6 +119,6 @@ export const resolveTicket = mutation({
       throw new Error("Ticket not found");
     }
 
-    await resolveThread(ctx, { threadId: ticket?.source.id });
+    await ctx.runMutation(internal.discord.resolveThread, { threadId: ticket.source.id })
   },
 });
