@@ -7,16 +7,19 @@ import {
   Client,
   ComponentType,
   EmbedBuilder,
-  GatewayIntentBits,
+  GatewayIntentBits
 } from "discord.js";
+import { commands, registerCommands } from "./commands/index.js";
 import { api } from "./convex/_generated/api.js";
 import {
+  registerEvents,
   serializeAuthor,
   serializeChannel,
   serializeMessage,
   serializePartialMessage,
   serializeThread,
 } from "./shared/discordUtils.js";
+import { interactionCreateEvent } from "./events/interaction-create.js";
 
 const apiToken = process.env.CONVEX_API_TOKEN;
 if (!apiToken) throw new Error("Specify CONVEX_API_TOKEN as an env variable");
@@ -47,6 +50,9 @@ const bot = new Client({
   ],
 });
 
+await registerEvents(bot, [interactionCreateEvent])
+await registerCommands(bot, commands);
+
 bot.on("clientReady", () => {
   console.log(`Logged in as ${bot.user?.tag}!`);
   console.log(
@@ -76,8 +82,7 @@ bot.on("messageCreate", async (msg) => {
     apiToken,
   };
   console.log(
-    `${args.author.username}: ${args.message.cleanContent} (${
-      args.channel.id
+    `${args.author.username}: ${args.message.cleanContent} (${args.channel.id
     }/${args.thread?.id ?? ""})`,
   );
   // Upload to Convex
@@ -171,9 +176,9 @@ bot.on("threadDelete", async (thread) => {
 });
 
 bot.on("interactionCreate", async (interaction) => {
-  if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
-    await interaction.reply("Pong!");
-  }
+  // if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
+  //   await interaction.reply("Pong!");
+  // }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
     let [button, revertButton] = [
@@ -277,4 +282,4 @@ bot.on("guildMemberAdd", async (member) => {
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 if (!DISCORD_TOKEN) throw "Need DISCORD_TOKEN env variable";
 
-bot.login(DISCORD_TOKEN);
+await bot.login(DISCORD_TOKEN);
