@@ -15,6 +15,8 @@ const MAX_MESSAGE_BODY_LENGTH = 250;
 const recordBytes = (doc: DiscordDocument) =>
   new TextEncoder().encode(JSON.stringify(doc)).length;
 
+const sanitize = (s: string) => s.replace(/[^\x20-\x7E\xA0-\uFFFF]/g, "");
+
 export type DiscordDocument = {
   objectID: string;
   title: string;
@@ -76,7 +78,7 @@ const hydrateSearchDocument = async ({
         avatar: author.displayAvatarURL ?? "",
         convexer: author.roles.includes(CONVEXER_ROLE),
       },
-      body: message.cleanContent,
+      body: sanitize(message.cleanContent),
     });
   }
 
