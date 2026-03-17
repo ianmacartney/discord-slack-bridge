@@ -8,6 +8,13 @@ import {
 
 const CONVEXER_ROLE = "1019375583387463710";
 
+// Algolia record size limit is 10KB. Leave a small margin for safety.
+const ALGOLIA_MAX_RECORD_BYTES = 9_500;
+const MAX_MESSAGE_BODY_LENGTH = 250;
+
+const recordBytes = (doc: DiscordDocument) =>
+  new TextEncoder().encode(JSON.stringify(doc)).length;
+
 export type DiscordDocument = {
   objectID: string;
   title: string;
@@ -46,40 +53,34 @@ const hydrateSearchDocument = async ({
     return null;
   }
 
-  var tags = [];
+  const tags = [];
   for (const tag of thread.appliedTags) {
     const tagName: string | null = chan.tagMap.get(tag) ?? null;
     if (tagName) {
       tags.push(tagName);
     }
   }
-  // Now, let's fetch all the messages.
-  var messages: Doc<"messages">[] = await db
+  const messages: Doc<"messages">[] = await db
     .query("messages")
     .withIndex("threadId", (q) => q.eq("threadId", thread._id))
     .collect();
 
-  // Sort by id / snowflake order, this is the order the messages were said in.
   messages.sort((a, b) => Number(a.id) - Number(b.id));
 
-  // Username resolution with memoization.
-  var finalMessages = [];
+  const finalMessages = [];
   for (const message of messages) {
     const author = (await db.get(message.authorId))!;
-    const authorName = author.displayName ?? "";
-    const avatarUrl = author.displayAvatarURL ?? "";
-    const convexer = author.roles.includes(CONVEXER_ROLE);
     finalMessages.push({
       author: {
-        name: authorName,
-        avatar: avatarUrl,
-        convexer,
+        name: author.displayName ?? "",
+        avatar: author.displayAvatarURL ?? "",
+        convexer: author.roles.includes(CONVEXER_ROLE),
       },
       body: message.cleanContent,
     });
   }
 
-  return {
+  const doc: DiscordDocument = {
     title: thread.name,
     objectID: thread.id,
     channel: chan.name,
@@ -88,6 +89,47 @@ const hydrateSearchDocument = async ({
     messages: finalMessages,
     date: thread.createdTimestamp,
   };
+
+  // Progressive truncation to fit Algolia's 10KB record limit.
+  const degradations: string[] = [];
+
+  // Phase 1: truncate long message bodies.
+  if (recordBytes(doc) > ALGOLIA_MAX_RECORD_BYTES) {
+    let truncated = 0;
+    for (const msg of doc.messages) {
+      if (msg.body.length > MAX_MESSAGE_BODY_LENGTH) {
+        msg.body = msg.body.slice(0, MAX_MESSAGE_BODY_LENGTH) + "…";
+        truncated++;
+      }
+    }
+    if (truncated > 0) {
+      degradations.push(
+        `truncated ${truncated} message bodies to ${MAX_MESSAGE_BODY_LENGTH} chars`,
+      );
+    }
+  }
+
+  // Phase 2: drop oldest messages (keep the thread starter at index 0).
+  if (recordBytes(doc) > ALGOLIA_MAX_RECORD_BYTES && doc.messages.length > 1) {
+    const before = doc.messages.length;
+    while (
+      recordBytes(doc) > ALGOLIA_MAX_RECORD_BYTES &&
+      doc.messages.length > 1
+    ) {
+      doc.messages.splice(1, 1);
+    }
+    degradations.push(
+      `dropped ${before - doc.messages.length} of ${before} messages`,
+    );
+  }
+
+  if (degradations.length > 0) {
+    console.warn(
+      `[Algolia] Record degraded for ${doc.objectID} (${doc.channel}): ${degradations.join("; ")} [${recordBytes(doc)}B]`,
+    );
+  }
+
+  return doc;
 };
 
 type ChanInfo = Map<
@@ -136,7 +178,7 @@ export const updatedSearchDocuments = query(
     }
 
     const chanInfo = await getChanInfo({ db });
-    var hydratedBatch = [];
+    const hydratedBatch = [];
     for (const thread of newThreadBatch) {
       const hyDoc = await hydrateSearchDocument({ db, thread, chanInfo });
       if (hyDoc) {
