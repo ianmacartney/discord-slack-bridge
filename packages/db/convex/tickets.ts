@@ -11,7 +11,6 @@ import {
 import { DiscordChannel } from "./schema";
 import { paginationOptsValidator } from "convex/server";
 import { asyncMap } from "convex-helpers";
-import { resolveThread } from "./discord";
 import { isEmployeeEmail } from "./users";
 
 export function shouldCreateTicketForDiscordThread(thread: DiscordChannel) {
@@ -119,6 +118,8 @@ export const resolveTicket = mutation({
       throw new Error("Ticket not found");
     }
 
-    await resolveThread(ctx, { threadId: ticket?.source.id });
+    await ctx.runMutation(internal.discord.resolveThread, {
+      threadId: ticket.source.id,
+    });
   },
 });
