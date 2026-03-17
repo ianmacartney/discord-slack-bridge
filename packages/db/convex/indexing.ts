@@ -15,8 +15,6 @@ const MAX_MESSAGE_BODY_LENGTH = 250;
 const recordBytes = (doc: DiscordDocument) =>
   new TextEncoder().encode(JSON.stringify(doc)).length;
 
-const sanitize = (s: string) => s.replace(/[^\x20-\x7E\xA0-\uFFFF]/g, "");
-
 export type DiscordDocument = {
   objectID: string;
   title: string;
@@ -78,7 +76,7 @@ const hydrateSearchDocument = async ({
         avatar: author.displayAvatarURL ?? "",
         convexer: author.roles.includes(CONVEXER_ROLE),
       },
-      body: sanitize(message.cleanContent),
+      body: message.cleanContent,
     });
   }
 
@@ -166,8 +164,7 @@ export const updatedSearchDocuments = query(
     db,
   }: {
     db: DatabaseReader;
-  }): Promise<{ documents: DiscordDocument[]; position: number | null }> => {
-    // Grab the cursor for the last synced discord thread document.
+  }): Promise<{ documents: string; position: number | null }> => {
     const currentCursor =
       (await db.query("threadSearchStatus").first())?.indexedCursor ?? 0;
     const newThreadBatch: Doc<"threads">[] = await db
@@ -176,7 +173,7 @@ export const updatedSearchDocuments = query(
       .order("asc")
       .take(10);
     if (newThreadBatch.length == 0) {
-      return { documents: [], position: null };
+      return { documents: "[]", position: null };
     }
 
     const chanInfo = await getChanInfo({ db });
@@ -187,8 +184,10 @@ export const updatedSearchDocuments = query(
         hydratedBatch.push(hyDoc);
       }
     }
+    // Serialize here so Convex's transport doesn't have to handle
+    // exotic unicode in message content (lone surrogates, etc.).
     return {
-      documents: hydratedBatch,
+      documents: JSON.stringify(hydratedBatch),
       position: newThreadBatch[newThreadBatch.length - 1].version!,
     };
   },

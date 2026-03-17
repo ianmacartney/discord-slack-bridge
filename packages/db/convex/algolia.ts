@@ -3,6 +3,7 @@
 import { api } from "./_generated/api";
 import algoliasearch from "algoliasearch";
 import { internalAction } from "./_generated/server";
+import { DiscordDocument } from "./indexing";
 
 export const ALGOLIA_APP_ID = "1KIE511890";
 const DISCORD_INDEX = "discord";
@@ -16,13 +17,14 @@ export const index = internalAction(async ({ runQuery, runMutation }) => {
   const algolia = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_API_KEY);
   const index = algolia.initIndex(DISCORD_INDEX);
   while (true) {
-    const { documents, position } = await runQuery(
+    const { documents: documentsJson, position } = await runQuery(
       api.indexing.updatedSearchDocuments,
-      {}
+      {},
     );
     if (position == null) {
       break;
     }
+    const documents: DiscordDocument[] = JSON.parse(documentsJson);
     for (const doc of documents) {
       console.log(`(Re-)indexing thread ${doc.objectID}`);
       await index.saveObject(doc);
