@@ -24,6 +24,11 @@ export const registerAccountHandler = httpAction(async (ctx, request) => {
     discordUserId: discordId,
   });
 
+  console.log("[verification] registerAccount: scheduled addRole", {
+    discordUserId: discordId,
+    associatedAccountId,
+  });
+
   return new Response();
 });
 
@@ -104,10 +109,14 @@ export const addRoleIfAccountLinked = apiAction({
   handler: async ({ runQuery, runAction }, { discordUserId }) => {
     const isAccountLinked = await runQuery(
       internal.verification.isAccountLinked,
-      { discordUserId }
+      { discordUserId },
     );
 
     if (isAccountLinked) {
+      console.log(
+        "[verification] addRoleIfAccountLinked: account linked, adding role",
+        { discordUserId },
+      );
       await runAction(internal.verification_node.addRole, {
         discordUserId,
       });

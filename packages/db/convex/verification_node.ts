@@ -23,6 +23,18 @@ function getEnvIds() {
   return { guildId, roleId };
 }
 
+function logVerificationError(
+  operation: string,
+  context: Record<string, string>,
+  error: unknown,
+) {
+  console.error(`[verification] ${operation} failed`, {
+    ...context,
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+}
+
 export const addRole = internalAction({
   args: {
     discordUserId: v.string(),
@@ -37,8 +49,14 @@ export const addRole = internalAction({
     try {
       const member = await guild.members.fetch(discordUserId);
       await member.roles.add(roleId);
+      console.log("[verification] addRole succeeded", {
+        discordUserId,
+        guildId,
+        roleId,
+      });
     } catch (e) {
-      console.warn(e);
+      logVerificationError("addRole", { discordUserId, guildId, roleId }, e);
+      throw e;
     }
   },
 });
@@ -57,8 +75,14 @@ export const removeRole = internalAction({
     try {
       const member = await guild.members.fetch(discordUserId);
       await member.roles.remove(roleId);
+      console.log("[verification] removeRole succeeded", {
+        discordUserId,
+        guildId,
+        roleId,
+      });
     } catch (e) {
-      console.warn(e);
+      logVerificationError("removeRole", { discordUserId, guildId, roleId }, e);
+      throw e;
     }
   },
 });
