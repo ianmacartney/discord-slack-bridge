@@ -48,7 +48,7 @@ const touchThread = async (
     .order("desc")
     .first();
   const nextVersion = (mostRecent?.version ?? 0) + 1;
-  await db.patch(threadId, { version: nextVersion });
+  await db.patch("threads", threadId, { version: nextVersion });
 };
 
 export const addUniqueDoc = internalMutation({
@@ -78,7 +78,7 @@ export const forceRefreshVersions = internalMutation({
         ?.version ?? 0;
 
     for (const threadId of ids) {
-      await ctx.db.patch(threadId, { version: nextVersion });
+      await ctx.db.patch("threads", threadId, { version: nextVersion });
       nextVersion += 1;
     }
     if (!results.isDone) {
@@ -89,8 +89,8 @@ export const forceRefreshVersions = internalMutation({
   },
 });
 
-export const addThreadBatch = internalMutation(
-  async (
+export const addThreadBatch = internalMutation({
+  handler: async (
     { db },
     {
       authorsAndMessagesToAdd,
@@ -113,7 +113,7 @@ export const addThreadBatch = internalMutation(
     }
     await touchThread({ db }, { threadId });
   },
-);
+});
 
 export const receiveMessage = apiMutation({
   args: {
@@ -131,12 +131,12 @@ export const receiveMessage = apiMutation({
     }
     const authorId = await getOrCreate(ctx.db, "users", author);
     const channelId = await getOrCreate(ctx.db, "channels", channel);
-    const dbChannel = (await ctx.db.get(channelId))!;
+    const dbChannel = (await ctx.db.get("channels", channelId))!;
     let dbThread, threadId;
     if (thread) {
       threadId = await getOrCreate(ctx.db, "threads", { ...thread, channelId });
       await touchThread(ctx, { threadId });
-      dbThread = (await ctx.db.get(threadId))!;
+      dbThread = (await ctx.db.get("threads", threadId))!;
     }
     const messageId = await getOrCreate(ctx.db, "messages", {
       ...message,
@@ -201,15 +201,19 @@ export const updateMessage = mutation({
     let dbThread;
     if (threadId) {
       await touchThread({ db }, { threadId });
-      dbThread = await db.get(threadId);
+      dbThread = await db.get("threads", threadId);
       if (!dbThread) {
         throw new Error("Thread not found:" + threadId);
       }
     }
     // Overwrite authorId & channelId
-    await db.patch(existing._id, { ...message, authorId, channelId });
-    const channel = await db.get(channelId);
-    const author = await db.get(authorId);
+    await db.patch("messages", existing._id, {
+      ...message,
+      authorId,
+      channelId,
+    });
+    const channel = await db.get("channels", channelId);
+    const author = await db.get("users", authorId);
     if (!channel || !author) {
       throw new Error("Channel or author not found:" + channelId + authorId);
     }
@@ -245,12 +249,12 @@ export const deleteMessage = apiMutation({
       .withIndex("id", (q) => q.eq("id", id))
       .unique();
     if (!existing) return;
-    await db.patch(existing._id, { deleted: true });
+    await db.patch("messages", existing._id, { deleted: true });
     const { threadId } = existing;
     if (threadId) {
       await touchThread({ db }, { threadId });
     }
-    const channel = await db.get(existing.channelId);
+    const channel = await db.get("channels", existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackTs) {
       await scheduler.runAfter(0, internal.slack_node.deleteMessage, {
@@ -293,8 +297,8 @@ export const updateThread = apiMutation({
       .unique();
     if (!existing) return;
     await touchThread({ db }, { threadId: existing._id });
-    await db.patch(existing._id, thread);
-    const channel = await db.get(existing.channelId);
+    await db.patch("threads", existing._id, thread);
+    const channel = await db.get("channels", existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
       await scheduler.runAfter(
@@ -314,8 +318,8 @@ export const deleteThread = apiMutation({
       .withIndex("id", (q) => q.eq("id", id))
       .unique();
     if (!existing) return;
-    await db.patch(existing._id, { archived: true });
-    const channel = await db.get(existing.channelId);
+    await db.patch("threads", existing._id, { archived: true });
+    const channel = await db.get("channels", existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
       // For now let's keep it around but just mark it as archived.
@@ -339,7 +343,7 @@ export const refreshThreads = internalMutation({
     const threads = await ctx.db.query("threads").order("desc").take(1000);
     let after = 0;
     for (const thread of threads) {
-      const channel = await ctx.db.get(thread.channelId);
+      const channel = await ctx.db.get("channels", thread.channelId);
       if (!channel) throw new Error("Channel not found:" + thread.channelId);
       if (channel.slackChannelId && thread.slackThreadTs) {
         await ctx.scheduler.runAfter(
@@ -362,7 +366,7 @@ export const resolveThread = internalMutation({
     threadId: v.id("threads"),
   },
   handler: async ({ db, scheduler }, { threadId }) => {
-    const thread = await db.get(threadId);
+    const thread = await db.get("threads", threadId);
     if (!thread) {
       throw "Not a thread";
     }
@@ -373,14 +377,14 @@ export const resolveThread = internalMutation({
     if (!thread.channelId) {
       throw "No channel associated with the thread";
     }
-    const channel = await db.get(thread.channelId);
+    const channel = await db.get("channels", thread.channelId);
     if (!channel) throw new Error("Channel not found:" + thread.channelId);
     if (!channel.availableTags?.find((t) => t.id === resolvedTagId)) {
       console.log("Tag not found, refusing to apply");
       return;
     }
     const tags = [...thread.appliedTags, resolvedTagId];
-    await db.patch(threadId, {
+    await db.patch("threads", threadId, {
       appliedTags: tags,
     });
     await touchThread({ db }, { threadId });

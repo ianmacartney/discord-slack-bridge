@@ -85,7 +85,7 @@ async function deleteRegistrations(db: DatabaseWriter, discordUserId: string) {
     .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
     .collect();
   for (const { _id } of existingRows) {
-    await db.delete(_id);
+    await db.delete("registrations", _id);
   }
 }
 

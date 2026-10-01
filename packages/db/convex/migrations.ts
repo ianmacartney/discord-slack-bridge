@@ -83,8 +83,11 @@ const migration = makeMigration(internalMutation, {
 //   },
 // });
 
-export const status = internalQuery(async (ctx) => {
-  return await getStatus(ctx, { migrationTable: "migrations" });
+export const status = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await getStatus(ctx, { migrationTable: "migrations" });
+  },
 });
 
 export const cancel = internalMutation({
