@@ -12,7 +12,8 @@
     "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
     "dockerBot": "docker run --init --env-file .env --rm discordbot:latest",
     "flyDeploy": "npm run build && fly deploy",
-    "setup": "convex dev --until-success"
+    "setup": "convex dev --until-success",
+    "lint": "eslint convex"
   },
   "author": "",
   "license": "ISC",
@@ -27,7 +28,10 @@
     "openai": "^4.24.7"
   },
   "devDependencies": {
+    "@convex-dev/eslint-plugin": "^5.0.0",
     "@types/lodash": "^4.14.202",
-    "typescript": "^5.9.3"
+    "eslint": "^10.11.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0"
   }
 }
