@@ -14,9 +14,9 @@
     "turbo": "latest"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
-  "packageManager": "pnpm@8.9.0",
+  "packageManager": "pnpm@12.8.1",
   "workspaces": [
     "apps/*",
     "packages/*"
