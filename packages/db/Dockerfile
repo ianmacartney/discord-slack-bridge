@@ -1,6 +1,6 @@
 FROM node:18 AS builder
 
-RUN corepack enable pnpm
+RUN npm install -g pnpm@12.8.1
 WORKDIR /usr/src/app
 COPY package.json ./
 RUN pnpm install --prod
