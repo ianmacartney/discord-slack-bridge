@@ -2,6 +2,7 @@ packages:
   - 'apps/*'
   - 'packages/*'
 allowBuilds:
+  '@clerk/shared': false
   esbuild: true
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.11.6'
