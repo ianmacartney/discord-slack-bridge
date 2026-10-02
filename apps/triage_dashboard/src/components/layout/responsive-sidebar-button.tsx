@@ -1,14 +1,15 @@
 "use client";
 
-import { Button, ButtonProps } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { fr } from "@/lib/utils";
 import { Cross2Icon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Slot } from "@radix-ui/react-slot";
+import type React from "react";
 import { useState } from "react";
 import { RemoveScroll } from "react-remove-scroll";
 
 // Pass the sidebar displayed when the button is clicked as children
-export const ResponsiveSidebarButton = fr<HTMLButtonElement, ButtonProps>(
+export const ResponsiveSidebarButton = fr<HTMLButtonElement, React.ComponentProps<typeof Button>>(
   function ResponsiveSidebarButton({ children, ...props }, ref) {
     const [showSidebar, setShowSidebar] = useState(false);
 

@@ -1,10 +1,9 @@
-import { type ClassValue, clsx } from "clsx";
+import { cn } from "cn";
 import { ForwardRefRenderFunction, PropsWithoutRef, forwardRef } from "react";
-import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// shadcn's own class merger (clsx + tailwind-merge in one). Components added with the shadcn CLI import it from "cn".
+export { cn };
+type ClassValue = Parameters<typeof cn>[number];
 
 // forward refs
 export function fr<T = HTMLElement, P = React.HTMLAttributes<T>>(
