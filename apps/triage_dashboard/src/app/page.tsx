@@ -105,7 +105,11 @@ function Triage() {
                 </TableCell>
               </TableRow>
             ))}
-          {results && results.length === 0 ? "There are no tickets" : null}
+          {results && results.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5}>There are no tickets</TableCell>
+            </TableRow>
+          )}
         </TableBody>
         <TableFooter></TableFooter>
       </Table>
