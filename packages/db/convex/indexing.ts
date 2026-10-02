@@ -1,10 +1,6 @@
+import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
-import {
-  DatabaseReader,
-  DatabaseWriter,
-  mutation,
-  query,
-} from "./_generated/server";
+import { DatabaseReader, mutation, query } from "./_generated/server";
 
 const CONVEXER_ROLE = "1019375583387463710";
 
@@ -48,7 +44,7 @@ const hydrateSearchDocument = async ({
   }
 
   // Get the actual channel object to access the Discord channel ID.
-  const channel = await db.get(thread.channelId);
+  const channel = await db.get("channels", thread.channelId);
   if (!channel) {
     return null;
   }
@@ -69,7 +65,7 @@ const hydrateSearchDocument = async ({
 
   const finalMessages = [];
   for (const message of messages) {
-    const author = (await db.get(message.authorId))!;
+    const author = (await db.get("users", message.authorId))!;
     finalMessages.push({
       author: {
         name: author.displayName ?? "",
@@ -159,8 +155,9 @@ const getChanInfo = async ({
   return tagMap;
 };
 
-export const updatedSearchDocuments = query(
-  async ({
+export const updatedSearchDocuments = query({
+  args: {},
+  handler: async ({
     db,
   }: {
     db: DatabaseReader;
@@ -191,18 +188,18 @@ export const updatedSearchDocuments = query(
       position: newThreadBatch[newThreadBatch.length - 1].version!,
     };
   },
-);
+});
 
-export const setSearchIndex = mutation(
-  async (
-    { db }: { db: DatabaseWriter },
-    { position }: { position: number },
-  ): Promise<void> => {
+export const setSearchIndex = mutation({
+  args: { position: v.number() },
+  handler: async ({ db }, { position }): Promise<void> => {
     const existing = await db.query("threadSearchStatus").first();
     if (existing == null) {
       await db.insert("threadSearchStatus", { indexedCursor: position });
     } else {
-      await db.patch(existing._id, { indexedCursor: position });
+      await db.patch("threadSearchStatus", existing._id, {
+        indexedCursor: position,
+      });
     }
   },
-);
+});

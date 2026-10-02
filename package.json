@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
   },
   "devDependencies": {
-    "convex": "^1.33.1",
+    "convex": "^1.46.0",
     "prettier": "^3.1.0",
-    "turbo": "latest"
+    "turbo": "^2.11.6"
   },
   "engines": {
     "node": ">=20"

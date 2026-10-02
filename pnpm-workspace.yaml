@@ -2,4 +2,13 @@ packages:
   - 'apps/*'
   - 'packages/*'
 allowBuilds:
+  '@clerk/shared': false
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@turbo/darwin-64@2.11.6'
+  - '@turbo/darwin-arm64@2.11.6'
+  - '@turbo/linux-64@2.11.6'
+  - '@turbo/linux-arm64@2.11.6'
+  - '@turbo/windows-64@2.11.6'
+  - '@turbo/windows-arm64@2.11.6'
+  - turbo@2.11.6

@@ -80,28 +80,37 @@ export const interactivityHandler = httpAction(
         console.log(JSON.stringify(body));
     }
     return new Response();
-  }
+  },
 );
-export const checkForUnique = internalQuery(async ({ db }) => {
-  const seen = /* @__PURE__ */ new Set();
-  const messages = await db.query("messages").collect();
-  for (const message2 of messages) {
-    if (message2.slackTs && seen.has(message2.slackTs)) {
-      throw new Error(message2.slackTs);
+
+export const checkForUnique = internalQuery({
+  args: {},
+  handler: async ({ db }) => {
+    const seen = /* @__PURE__ */ new Set();
+    const messages = await db.query("messages").collect();
+    for (const message2 of messages) {
+      if (message2.slackTs && seen.has(message2.slackTs)) {
+        throw new Error(message2.slackTs);
+      }
+      seen.add(message2.slackTs);
     }
-    seen.add(message2.slackTs);
-  }
+  },
 });
-export const checkThreadForUnique = internalQuery(async ({ db }) => {
-  const seenThread = /* @__PURE__ */ new Set();
-  const threads = await db.query("threads").collect();
-  for (const thread of threads) {
-    if (thread.slackThreadTs && seenThread.has(thread.slackThreadTs)) {
-      throw new Error(thread.slackThreadTs);
+
+export const checkThreadForUnique = internalQuery({
+  args: {},
+  handler: async ({ db }) => {
+    const seenThread = /* @__PURE__ */ new Set();
+    const threads = await db.query("threads").collect();
+    for (const thread of threads) {
+      if (thread.slackThreadTs && seenThread.has(thread.slackThreadTs)) {
+        throw new Error(thread.slackThreadTs);
+      }
+      seenThread.add(thread.slackThreadTs);
     }
-    seenThread.add(thread.slackThreadTs);
-  }
+  },
 });
+
 export const getMessageByTs = internalQuery({
   args: {
     messageTs: v.string(),
@@ -147,14 +156,14 @@ export const getChannelIdByTs = internalQuery({
       .withIndex("slackTs", (q) => q.eq("slackTs", messageTs))
       .first();
     if (message && message.threadId) {
-      const thread = await db.get(message.threadId);
+      const thread = await db.get("threads", message.threadId);
       if (!thread) {
         throw new Error("Thread not found");
       }
       return thread.id;
     }
     if (message && message.channelId) {
-      const channel = await db.get(message.channelId);
+      const channel = await db.get("channels", message.channelId);
       if (!channel) {
         throw new Error("Channel not found");
       }
@@ -171,7 +180,7 @@ export const getUserBySlackId = internalQuery({
   handler: async ({ db }, { slackUserId }) => {
     return await db
       .query("users")
-      .filter((q) => q.eq(q.field("slackUserId"), slackUserId))
+      .withIndex("by_slackUserId", (q) => q.eq("slackUserId", slackUserId))
       .first();
   },
 });
@@ -188,7 +197,7 @@ export const startedThread = internalMutation({
     threadTs: v.string(),
   },
   handler: async ({ db }, { threadId, threadTs }) => {
-    await db.patch(threadId, { slackThreadTs: threadTs });
+    await db.patch("threads", threadId, { slackThreadTs: threadTs });
   },
 });
 
@@ -198,6 +207,6 @@ export const sentMessage = internalMutation({
     messageTs: v.string(),
   },
   handler: async ({ db }, { messageId, messageTs }) => {
-    await db.patch(messageId, { slackTs: messageTs });
+    await db.patch("messages", messageId, { slackTs: messageTs });
   },
 });

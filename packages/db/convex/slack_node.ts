@@ -1,11 +1,11 @@
 "use node";
 import { internal } from "./_generated/api";
-import { internalAction } from "./_generated/server";
+import { internalAction, env } from "./_generated/server";
 import { WebClient } from "@slack/web-api";
 import { ObjectType, v } from "convex/values";
 
 const slackClient = () => {
-  const token = process.env.SLACK_TOKEN;
+  const token = env.SLACK_TOKEN;
   if (!token) throw new Error("Specify SLACK_TOKEN in the dashboard");
   return new WebClient(token);
 };
@@ -30,9 +30,8 @@ export const sendMessage = internalAction({
     title: v.optional(v.string()),
     emojis: v.optional(v.array(v.string())),
   },
-  handler: async (
-    { runMutation },
-    {
+  handler: async ({ runMutation }, args) => {
+    const {
       messageId,
       threadId,
       author,
@@ -40,11 +39,11 @@ export const sendMessage = internalAction({
       channel,
       channelName,
       linkUrl,
-      threadTs,
       title,
       emojis,
-    },
-  ) => {
+    } = args;
+    // Reassigned below once a new Slack thread is started.
+    let threadTs = args.threadTs;
     const web = slackClient();
     if (threadId && !threadTs && title) {
       const threadMsg = await web.chat.postMessage({

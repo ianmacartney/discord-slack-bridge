@@ -5,9 +5,10 @@ import {
   startMigrationsSerially,
 } from "convex-helpers/server/migrations";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
+// Kept as scaffolding for the commented-out migrations below.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const migration = makeMigration(internalMutation, {
   migrationTable: "migrations",
 });
@@ -83,22 +84,30 @@ const migration = makeMigration(internalMutation, {
 //   },
 // });
 
-export const status = internalQuery(async (ctx) => {
-  return await getStatus(ctx, { migrationTable: "migrations" });
+export const status = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await getStatus(ctx, { migrationTable: "migrations" });
+  },
 });
 
 export const cancel = internalMutation({
   args: { fn: v.string() },
   handler: async (ctx, { fn }) => {
+    // The migration name is a string at runtime; the helper wants a typed reference.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await cancelMigration(ctx, "migrations", fn as any);
   },
 });
 
-export default internalMutation(async (ctx) => {
-  await startMigrationsSerially(ctx, [
-    // internal.migrations.deleteDeprecatedChannelFields,
-    // internal.migrations.deleteDeprecatedMessageFields,
-    // internal.migrations.deleteDeprecatedThreadFields,
-    // internal.migrations.deleteDeprecatedUserFields,
-  ]);
+export default internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    await startMigrationsSerially(ctx, [
+      // internal.migrations.deleteDeprecatedChannelFields,
+      // internal.migrations.deleteDeprecatedMessageFields,
+      // internal.migrations.deleteDeprecatedThreadFields,
+      // internal.migrations.deleteDeprecatedUserFields,
+    ]);
+  },
 });
