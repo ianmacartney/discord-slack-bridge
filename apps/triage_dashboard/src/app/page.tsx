@@ -25,14 +25,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getDateTime, getRelativeTime } from "@/lib/time";
-import { useState } from "react";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TriagePage() {
   return (
     <>
       <Authenticated>
-        <Triage />
+        <Suspense>
+          <Triage />
+        </Suspense>
       </Authenticated>
       <Unauthenticated>
         <div className="container p-10">Sign in above.</div>
@@ -42,10 +45,11 @@ export default function TriagePage() {
 }
 
 function Triage() {
-  const [resolved, setResolved] = useState(false);
+  // Chosen in the sidebar: ?view=open (default), ?view=mine or ?view=resolved.
+  const view = useSearchParams().get("view");
   const { isLoading, loadMore, results, status } = usePaginatedQuery(
     api.tickets.getTickets,
-    { resolved, mine: false },
+    { resolved: view === "resolved", mine: view === "mine" },
     { initialNumItems: 10 },
   );
   const resolve = useMutation(api.tickets.resolveTicket);

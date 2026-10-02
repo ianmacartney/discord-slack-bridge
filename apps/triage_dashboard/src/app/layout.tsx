@@ -2,16 +2,13 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ConvexClientProvider from "./ConvexClientProvider";
-import { Footer } from "@/components/layout/footer";
-import { StickyHeader } from "@/components/layout/sticky-header";
-import { SignInAndSignUpButtons } from "../components/SignInAndSignUpButtons";
-import { Authenticated } from "convex/react";
+import { AppShell } from "@/components/app-shell";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Notes App",
-  description: "This is an app to take notes.",
+  title: "Discord Triage",
+  description: "Support tickets escalated from the Discord support forum.",
 };
 
 export default function RootLayout({
@@ -23,12 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ConvexClientProvider>
-          <StickyHeader className="p-2 flex items-center justify-between h-13">
-            Discord Triage
-            <SignInAndSignUpButtons />
-          </StickyHeader>
-          <main className="min-h-[calc(100vh-(2.5rem+1px))]">{children}</main>
-          <Footer>Footer below fold</Footer>
+          <AppShell>{children}</AppShell>
         </ConvexClientProvider>
       </body>
     </html>
