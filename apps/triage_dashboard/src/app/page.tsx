@@ -4,30 +4,11 @@ import {
   Unauthenticated,
   useMutation,
   usePaginatedQuery,
-  useQuery,
 } from "convex/react";
-import { SignInButton, UserButton } from "@clerk/clerk-react";
-import { Button } from "@/components/ui/button";
-import { Footer } from "@/components/layout/footer";
-import { Paragraph } from "@/components/layout/paragraph";
-import { ResponsiveSidebarButton } from "@/components/layout/responsive-sidebar-button";
-import { StickyHeader } from "@/components/layout/sticky-header";
-import { StickySidebar } from "@/components/layout/sticky-sidebar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { api } from "@discord-slack-bridge/db/convex/_generated/api";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { getDateTime, getRelativeTime } from "@/lib/time";
-import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Suspense } from "react";
+import { api } from "@discord-slack-bridge/db/convex/_generated/api";
+import { TicketList } from "@/components/ticket-list";
 
 export default function TriagePage() {
   return (
@@ -38,7 +19,7 @@ export default function TriagePage() {
         </Suspense>
       </Authenticated>
       <Unauthenticated>
-        <div className="container p-10">Sign in above.</div>
+        <div className="p-6 md:p-8">Sign in above.</div>
       </Unauthenticated>
     </>
   );
@@ -46,7 +27,7 @@ export default function TriagePage() {
 
 function Triage() {
   // Chosen in the sidebar: ?view=open (default), ?view=mine or ?view=resolved.
-  const view = useSearchParams().get("view");
+  const view = useSearchParams().get("view") ?? "open";
   const { isLoading, loadMore, results, status } = usePaginatedQuery(
     api.tickets.getTickets,
     { resolved: view === "resolved", mine: view === "mine" },
@@ -54,69 +35,13 @@ function Triage() {
   );
   const resolve = useMutation(api.tickets.resolveTicket);
   return (
-    <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Age</TableHead>
-            <TableHead>Updated</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={5}>
-                <Skeleton>Loading...</Skeleton>
-              </TableCell>
-            </TableRow>
-          )}
-          {results &&
-            results.map((ticket) => (
-              <TableRow key={ticket._id}>
-                <TableCell>
-                  {" "}
-                  <div
-                    className="font-mono text-sm text-neutral-n6"
-                    title={getDateTime(ticket._creationTime)}
-                  >
-                    {getRelativeTime(ticket._creationTime)}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div
-                    className="font-mono text-sm text-neutral-n6"
-                    title={getDateTime(ticket.updateTime)}
-                  >
-                    {getRelativeTime(ticket.updateTime)}
-                  </div>
-                </TableCell>
-                <TableCell>{ticket.status}</TableCell>
-                <TableCell>{ticket.title}</TableCell>
-                <TableCell className="flex items-center gap-3">
-                  <Button variant={"outline"}>Assign</Button>
-                  <Button
-                    variant={"destructive"}
-                    onClick={() => {
-                      resolve({ ticketId: ticket._id });
-                    }}
-                  >
-                    Resolve
-                  </Button>
-                  <Button>Go to Discord</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          {results && results.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5}>There are no tickets</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-        <TableFooter></TableFooter>
-      </Table>
-    </>
+    <TicketList
+      view={view}
+      results={results}
+      isLoading={isLoading}
+      canLoadMore={status === "CanLoadMore"}
+      loadMore={() => loadMore(10)}
+      onResolve={(ticketId) => resolve({ ticketId })}
+    />
   );
 }

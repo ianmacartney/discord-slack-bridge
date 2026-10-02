@@ -9,7 +9,7 @@ export const getRelativeTime = (time: number) => {
 
 export const getDateTime = (time: number) => {
   return `${dayjs(time).format("MMMM D, YYYY")} at ${dayjs(time).format(
-    "H:MM A",
+    "h:mm A",
   )}`;
 };
 
