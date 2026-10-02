@@ -25,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getDateTime, getRelativeTime } from "@/lib/time";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TriagePage() {
@@ -49,16 +49,6 @@ function Triage() {
     { initialNumItems: 10 },
   );
   const resolve = useMutation(api.tickets.resolveTicket);
-  const ticket = useMemo(
-    () => ({
-      _id: "id",
-      _creationTime: Date.now() - 10000,
-      updateTime: Date.now(),
-      source: { type: "discord", id: "123" },
-      status: "escalated",
-    }),
-    [],
-  );
   return (
     <>
       <Table>
@@ -115,7 +105,11 @@ function Triage() {
                 </TableCell>
               </TableRow>
             ))}
-          {results && results.length === 0 ? "There are no tickets" : null}
+          {results && results.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5}>There are no tickets</TableCell>
+            </TableRow>
+          )}
         </TableBody>
         <TableFooter></TableFooter>
       </Table>

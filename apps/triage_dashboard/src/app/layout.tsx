@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ConvexClientProvider>
-          <StickyHeader className="p-2 flex items-center justify-between h-[3.25rem]">
+          <StickyHeader className="p-2 flex items-center justify-between h-13">
             Discord Triage
             <SignInAndSignUpButtons />
           </StickyHeader>
