@@ -4,6 +4,7 @@ import {
   DatabaseWriter,
   httpAction,
   internalQuery,
+  env,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { apiAction } from "./apiFunctions";
@@ -49,7 +50,7 @@ export const unregisterAccountHandler = httpAction(async (ctx, request) => {
 });
 
 function authorizeWebhookRequest(request: Request) {
-  const webhookToken = process.env.VERIFICATION_WEBHOOK_TOKEN;
+  const webhookToken = env.VERIFICATION_WEBHOOK_TOKEN;
   if (!webhookToken) {
     throw new Error("Token for webhook requests not set");
   }

@@ -9,6 +9,7 @@ import {
   internalQuery,
   mutation,
   MutationCtx,
+  env,
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
 import {
@@ -17,7 +18,6 @@ import {
   DiscordThread,
   DiscordUser,
 } from "./schema";
-import { createTicket, shouldCreateTicketForDiscordThread } from "./tickets";
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -27,9 +27,9 @@ const getOrCreate = async <TableName extends DiscordRelatedTables>(
 ) => {
   const existing = await db
     .query(table)
-    // types seem to bail, but all of them have an id index by other typing.
-    .withIndex("id", (q) => q.eq("id", doc.id as any))
+    .withIndex("id", (q) => q.eq("id", doc.id))
     .unique();
+
   if (existing) {
     // TODO: update fields if they have changed
     return existing._id;
@@ -51,6 +51,8 @@ const touchThread = async (
   await db.patch("threads", threadId, { version: nextVersion });
 };
 
+// Generic over the table, which Convex validators can't express.
+// eslint-disable-next-line @convex-dev/require-args-validator
 export const addUniqueDoc = internalMutation({
   handler: async <TableName extends DiscordRelatedTables>(
     { db }: MutationCtx,
@@ -89,6 +91,8 @@ export const forceRefreshVersions = internalMutation({
   },
 });
 
+// Takes [author, message] tuples, which Convex validators can't express.
+// eslint-disable-next-line @convex-dev/require-args-validator
 export const addThreadBatch = internalMutation({
   handler: async (
     { db },
@@ -176,6 +180,8 @@ function makeLinkUrl(dbThread: Doc<"threads"> | undefined) {
     : undefined;
 }
 
+// Validation is deliberately off until `partial` lands, see the TODO below.
+// eslint-disable-next-line @convex-dev/require-args-validator
 export const updateMessage = mutation({
   // TODO: turn on validation after rollout & `partial` implementation
   // args: {
@@ -188,7 +194,7 @@ export const updateMessage = mutation({
       apiToken,
     }: { message: Partial<DiscordMessage> & { id: string }; apiToken: string },
   ) => {
-    if (apiToken !== process.env.CONVEX_API_TOKEN) {
+    if (apiToken !== env.CONVEX_API_TOKEN) {
       // TODO: just use apiMutation once we have arg validation here.
       throw new Error("Invalid API token");
     }
@@ -357,9 +363,9 @@ export const refreshThreads = internalMutation({
   },
 });
 
-const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
-if (!resolvedTagId)
-  throw new Error("Specify DISCORD_RESOLVED_TAG_ID as an env variable");
+// Declared as a required string in convex.config.ts, so deploys fail early if
+// it's missing.
+const resolvedTagId = env.DISCORD_RESOLVED_TAG_ID;
 
 export const resolveThread = internalMutation({
   args: {

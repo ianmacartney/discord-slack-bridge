@@ -82,6 +82,7 @@ export const interactivityHandler = httpAction(
     return new Response();
   },
 );
+
 export const checkForUnique = internalQuery({
   args: {},
   handler: async ({ db }) => {
@@ -95,6 +96,7 @@ export const checkForUnique = internalQuery({
     }
   },
 });
+
 export const checkThreadForUnique = internalQuery({
   args: {},
   handler: async ({ db }) => {
@@ -108,6 +110,7 @@ export const checkThreadForUnique = internalQuery({
     }
   },
 });
+
 export const getMessageByTs = internalQuery({
   args: {
     messageTs: v.string(),
@@ -177,7 +180,7 @@ export const getUserBySlackId = internalQuery({
   handler: async ({ db }, { slackUserId }) => {
     return await db
       .query("users")
-      .filter((q) => q.eq(q.field("slackUserId"), slackUserId))
+      .withIndex("by_slackUserId", (q) => q.eq("slackUserId", slackUserId))
       .first();
   },
 });

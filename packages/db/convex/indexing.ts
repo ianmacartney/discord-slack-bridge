@@ -1,10 +1,6 @@
+import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
-import {
-  DatabaseReader,
-  DatabaseWriter,
-  mutation,
-  query,
-} from "./_generated/server";
+import { DatabaseReader, mutation, query } from "./_generated/server";
 
 const CONVEXER_ROLE = "1019375583387463710";
 
@@ -195,10 +191,8 @@ export const updatedSearchDocuments = query({
 });
 
 export const setSearchIndex = mutation({
-  handler: async (
-    { db }: { db: DatabaseWriter },
-    { position }: { position: number },
-  ): Promise<void> => {
+  args: { position: v.number() },
+  handler: async ({ db }, { position }): Promise<void> => {
     const existing = await db.query("threadSearchStatus").first();
     if (existing == null) {
       await db.insert("threadSearchStatus", { indexedCursor: position });

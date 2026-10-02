@@ -2,7 +2,7 @@ import {
   customAction,
   customMutation,
 } from "convex-helpers/server/customFunctions";
-import { action, mutation } from "./_generated/server";
+import { action, mutation, env } from "./_generated/server";
 import { v } from "convex/values";
 
 export const apiMutation = customMutation(mutation, {
@@ -10,7 +10,8 @@ export const apiMutation = customMutation(mutation, {
     apiToken: v.string(),
   },
   input: async (_ctx, args) => {
-    if (args.apiToken !== process.env.CONVEX_API_TOKEN) {
+    // What is this for?
+    if (args.apiToken !== env.CONVEX_API_TOKEN) {
       throw new Error("Invalid API Token");
     }
     return { ctx: {}, args: {} };
@@ -22,7 +23,7 @@ export const apiAction = customAction(action, {
     apiToken: v.string(),
   },
   input: async (_ctx, args) => {
-    if (args.apiToken !== process.env.CONVEX_API_TOKEN) {
+    if (args.apiToken !== env.CONVEX_API_TOKEN) {
       throw new Error("Invalid API Token");
     }
     return { ctx: {}, args: {} };

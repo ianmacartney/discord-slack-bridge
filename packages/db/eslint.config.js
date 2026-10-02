@@ -3,7 +3,11 @@ import tseslint from "typescript-eslint";
 import convexPlugin from "@convex-dev/eslint-plugin";
 
 export default defineConfig([
-  globalIgnores(["dist", "convex/_generated"]),
+  globalIgnores(["dist", "convex/_generated", ".agents", ".claude"]),
+  ...tseslint.configs.recommended.map((c) => ({
+    ...c,
+    files: ["convex/**/*.ts"],
+  })),
   {
     files: ["convex/**/*.ts"],
     languageOptions: {
@@ -13,4 +17,13 @@ export default defineConfig([
     },
   },
   ...convexPlugin.configs.recommended,
+  {
+    files: ["convex/**/*.ts"],
+    rules: {
+      "max-len": [
+        "error",
+        { code: 120, ignoreUrls: true, ignoreTemplateLiterals: true },
+      ],
+    },
+  },
 ]);

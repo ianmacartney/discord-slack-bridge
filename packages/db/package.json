@@ -23,9 +23,7 @@
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.124",
     "discord.js": "^14.9.0",
-    "lodash": "^4.17.21",
-    "node-fetch": "^3.3.0",
-    "openai": "^4.24.7"
+    "lodash": "^4.17.21"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^5.0.0",

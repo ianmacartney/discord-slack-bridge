@@ -2,7 +2,7 @@
 "use node";
 import { api } from "./_generated/api";
 import algoliasearch from "algoliasearch";
-import { internalAction } from "./_generated/server";
+import { internalAction, env } from "./_generated/server";
 import { DiscordDocument } from "./indexing";
 
 export const ALGOLIA_APP_ID = "1KIE511890";
@@ -11,7 +11,7 @@ const DISCORD_INDEX = "discord";
 export const index = internalAction({
   args: {},
   handler: async ({ runQuery, runMutation }) => {
-    const ALGOLIA_API_KEY = process.env.ALGOLIA_API_KEY;
+    const ALGOLIA_API_KEY = env.ALGOLIA_API_KEY;
     if (!ALGOLIA_API_KEY) {
       console.warn("ALGOLIA_API_KEY not set");
       return;

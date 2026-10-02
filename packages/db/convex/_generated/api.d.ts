@@ -10,7 +10,6 @@
 
 import type * as algolia from "../algolia.js";
 import type * as apiFunctions from "../apiFunctions.js";
-import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
 import type * as discord_node from "../discord_node.js";
 import type * as http from "../http.js";
@@ -33,7 +32,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   algolia: typeof algolia;
   apiFunctions: typeof apiFunctions;
-  crons: typeof crons;
   discord: typeof discord;
   discord_node: typeof discord_node;
   http: typeof http;
