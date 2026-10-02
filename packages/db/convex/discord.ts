@@ -12,12 +12,24 @@ import {
   env,
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
+import { limitPerPerson } from "./limits";
 import {
   DiscordChannel,
   DiscordMessage,
   DiscordThread,
   DiscordUser,
 } from "./schema";
+
+/** An order-independent fingerprint of a forum's tags, so we only write when they actually changed. */
+function tagSignature(tags: DiscordChannel["availableTags"]) {
+  return (tags ?? [])
+    .map(
+      (t) =>
+        `${t.id}:${t.name}:${t.moderated}:${t.emoji?.id ?? ""}:${t.emoji?.name ?? ""}`,
+    )
+    .sort()
+    .join("|");
+}
 
 type DiscordRelatedTables = "users" | "channels" | "threads" | "messages";
 const getOrCreate = async <TableName extends DiscordRelatedTables>(
@@ -135,7 +147,18 @@ export const receiveMessage = apiMutation({
     }
     const authorId = await getOrCreate(ctx.db, "users", author);
     const channelId = await getOrCreate(ctx.db, "channels", channel);
-    const dbChannel = (await ctx.db.get("channels", channelId))!;
+    let dbChannel = (await ctx.db.get("channels", channelId))!;
+    // getOrCreate never updates an existing row, so keep a forum's tag list fresh: auto-tagging and the
+    // resolved-tag check both read it, and tags are often added after the forum was first seen.
+    if (
+      tagSignature(dbChannel.availableTags) !==
+      tagSignature(channel.availableTags)
+    ) {
+      await ctx.db.patch("channels", channelId, {
+        availableTags: channel.availableTags,
+      });
+      dbChannel = { ...dbChannel, availableTags: channel.availableTags };
+    }
     let dbThread, threadId;
     if (thread) {
       threadId = await getOrCreate(ctx.db, "threads", { ...thread, channelId });
@@ -148,6 +171,47 @@ export const receiveMessage = apiMutation({
       channelId,
       threadId,
     });
+
+    // A forum post's first message has the same id as the post itself, so this runs once per new post and never
+    // for replies. It only does anything in the forum chosen with /tags (see tags.ts).
+    if (threadId && thread && message.id === thread.id) {
+      await ctx.scheduler.runAfter(0, internal.tags.tagNewPost, { threadId });
+    }
+
+    // Rule 5: @everyone and @here. Checked exactly, no AI: delete, time out, and post a card recommending a ban.
+    if (
+      !author.bot &&
+      (message.type === 0 || message.type === 19) &&
+      // Not preceded by a word character, so "jane@here.example" is not a mention.
+      /(^|\W)@(everyone|here)\b/.test(message.content)
+    ) {
+      await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
+        messageId,
+      });
+    }
+
+    // Per-person speed limit: a person posting faster than limits.ts allows gets a "slow down" reply.
+    if (!author.bot && (message.type === 0 || message.type === 19)) {
+      const speed = await limitPerPerson(ctx, "messageFlood", author.id);
+      if (!speed.ok) {
+        await ctx.scheduler.runAfter(0, internal.slowdown_node.sendSlowDown, {
+          messageId,
+        });
+        // ...and an hour's timeout. Dry-run and the safety checks decide whether it really happens.
+        await ctx.scheduler.runAfter(
+          0,
+          internal.moderation.timeoutForFlooding,
+          { messageId },
+        );
+      }
+    }
+
+    // Classify ordinary messages (0: DEFAULT, 19: REPLY) with Jev. The verdict is only logged for now.
+    if (!author.bot && (message.type === 0 || message.type === 19)) {
+      await ctx.scheduler.runAfter(0, internal.classify.classifyMessage, {
+        messageId,
+      });
+    }
 
     // If the message is in a channel with an associated Slack channel, forward
     // it to that Slack channel.

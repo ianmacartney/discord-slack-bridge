@@ -188,3 +188,17 @@ users.members.map(m => `${m.real_name || m.name}: ${m.id}`)
 There isn't bidirectional syncing - sending slack messages don't go to Discord.
 They could, but we find it's better to chat in slack between coworkers, and
 then go and message in Discord directly (which gets synced to slack).
+
+## Brand colors
+
+The Discord cards the bot posts in the mod channel use the Convex brand colors. They are defined once, in
+`convex/brandColors.ts`:
+
+| Color | Hex | Used for |
+| --- | --- | --- |
+| Purple | `#8D2676` | A setting turned on or added, auto-tag notes, and friendly info cards (the needs-help follow-up) |
+| Yellow | `#F3B01C` | A setting turned off, cleared or moved, dry-run proposals, and slow-down notices |
+| Red | `#EE342F` | Live moderation proposals |
+
+Code asks for a meaning (`CARD_COLOR.added`, `.removed`, `.danger`) and never a hex value, so changing a color is a
+one-line edit in that file.
