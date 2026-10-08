@@ -2,9 +2,9 @@ import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
 
 const crons = cronJobs();
-crons.daily(
+crons.interval(
   "Sync discord support threads with Algolia",
-  { hourUTC: 8, minuteUTC: 17 },
-  internal.algolia.index,
+  { minutes: 1 }, // Every minute
+  internal.algolia.index
 );
 export default crons;
