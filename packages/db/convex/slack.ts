@@ -83,20 +83,6 @@ export const interactivityHandler = httpAction(
   },
 );
 
-export const checkForUnique = internalQuery({
-  args: {},
-  handler: async ({ db }) => {
-    const seen = /* @__PURE__ */ new Set();
-    const messages = await db.query("messages").collect();
-    for (const message2 of messages) {
-      if (message2.slackTs && seen.has(message2.slackTs)) {
-        throw new Error(message2.slackTs);
-      }
-      seen.add(message2.slackTs);
-    }
-  },
-});
-
 export const checkThreadForUnique = internalQuery({
   args: {},
   handler: async ({ db }) => {

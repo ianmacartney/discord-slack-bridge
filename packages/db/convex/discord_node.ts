@@ -13,8 +13,7 @@ import { Id } from "./_generated/dataModel";
 import { internalAction, env } from "./_generated/server";
 import { DiscordMessage, DiscordUser } from "./schema";
 
-// Maybe we can make this into a "custom mutation/query?"
-export const discordClient = async () => {
+const discordClient = async () => {
   const bot = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -23,7 +22,6 @@ export const discordClient = async () => {
       GatewayIntentBits.MessageContent,
     ],
   });
-  
   const token = env.DISCORD_TOKEN;
   if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
   await bot.login(token);

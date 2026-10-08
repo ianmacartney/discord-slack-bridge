@@ -363,8 +363,6 @@ export const refreshThreads = internalMutation({
   },
 });
 
-// Declared as a required string in convex.config.ts, so deploys fail early if
-// it's missing.
 const resolvedTagId = env.DISCORD_RESOLVED_TAG_ID;
 
 export const resolveThread = internalMutation({
