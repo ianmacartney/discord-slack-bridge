@@ -24,7 +24,11 @@ import {
   handleModChannelCommand,
   registerModChannelCommand,
 } from "./modChannelCommand.js";
-import { handleTagsCommand, registerTagsCommand } from "./tagCommand.js";
+import {
+  handleTagsAutocomplete,
+  handleTagsCommand,
+  registerTagsCommand,
+} from "./tagCommand.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -234,6 +238,11 @@ const ALERT_LABEL = {
 } as const;
 
 bot.on("interactionCreate", async (interaction) => {
+  // Tag suggestions while typing /tags edit or /tags delete.
+  if (interaction.isAutocomplete() && interaction.commandName === "tags") {
+    await handleTagsAutocomplete(interaction, convex, apiToken);
+    return;
+  }
   if (interaction.isChatInputCommand() && interaction.commandName === "ping") {
     await interaction.reply("Pong!");
   }

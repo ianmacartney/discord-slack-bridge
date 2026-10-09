@@ -3,6 +3,7 @@
 import type { ConvexHttpClient } from "convex/browser";
 import { ConvexError } from "convex/values";
 import {
+  AutocompleteInteraction,
   ChannelType,
   ChatInputCommandInteraction,
   ForumChannel,
@@ -82,7 +83,11 @@ export const tagsCommand = new SlashCommandBuilder()
       .setName("edit")
       .setDescription("Change a tag's name, emoji or when Jev uses it")
       .addStringOption((o) =>
-        o.setName("tag").setDescription("The tag to change").setRequired(true),
+        o
+          .setName("tag")
+          .setDescription("The tag to change")
+          .setAutocomplete(true)
+          .setRequired(true),
       )
       .addStringOption((o) =>
         o
@@ -105,7 +110,11 @@ export const tagsCommand = new SlashCommandBuilder()
       .setName("delete")
       .setDescription("Remove a tag from the forum and stop Jev using it")
       .addStringOption((o) =>
-        o.setName("tag").setDescription("The tag to remove").setRequired(true),
+        o
+          .setName("tag")
+          .setDescription("The tag to remove")
+          .setAutocomplete(true)
+          .setRequired(true),
       ),
   );
 
@@ -299,6 +308,38 @@ async function deleteTag(
     });
   }
   return `Deleted the tag "${tag?.name ?? name}" from <#${forum.id}>. Jev won't use it anymore.`;
+}
+
+/**
+ * Suggestions for the `tag` option of /tags edit and delete: the support forum's tags plus the ones Jev knows about,
+ * filtered by what's typed so far. Discord shows at most 25.
+ */
+export async function handleTagsAutocomplete(
+  interaction: AutocompleteInteraction,
+  convex: ConvexHttpClient,
+  apiToken: string,
+) {
+  const guild = interaction.guild;
+  if (!guild) return interaction.respond([]);
+  const typed = normalize(interaction.options.getFocused());
+  const names = new Set<string>();
+  try {
+    const forum = await autoTagForum(guild, convex, apiToken).catch(() => null);
+    for (const t of forum?.availableTags ?? []) names.add(t.name);
+    const { type, area } = await convex.query(api.tagRules.list, {
+      guildId: guild.id,
+      apiToken,
+    });
+    for (const d of [...type, ...area]) if (d.tag) names.add(d.tag);
+  } catch (e) {
+    console.error(e);
+  }
+  await interaction.respond(
+    [...names]
+      .filter((name) => normalize(name).includes(typed))
+      .slice(0, 25)
+      .map((name) => ({ name, value: name })),
+  );
 }
 
 export async function handleTagsCommand(
