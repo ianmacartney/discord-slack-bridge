@@ -8,14 +8,6 @@ My usecase is to mirror our "#support" forum in Discord into a Slack channel, so
 folks here don't have to periodically switch from Slack to Discord to scan, and
 which allows us to discuss and reference and search support threads in slack.
 
-## Discord bot
-
-- Classifies messages, deletes rule violations (1-day timeout plus a card in the mod channel), forwards long help
-  requests to the support forum and auto-tags new posts. Dry-run until `MODERATION_DRY_RUN=false`.
-- Moderators reply to a message with `!forward`, `!ban r="reason" d=7` or `!timeout r="reason" t=1h`.
-- Slash commands: `/modchannel`, `/forwardfrom`, `/tags`.
-- Confidence thresholds: `THRESHOLD_DEFAULTS` in `convex/violations.ts`.
-
 ## Installation
 
 ### 1. Convex backend
@@ -196,17 +188,3 @@ users.members.map(m => `${m.real_name || m.name}: ${m.id}`)
 There isn't bidirectional syncing - sending slack messages don't go to Discord.
 They could, but we find it's better to chat in slack between coworkers, and
 then go and message in Discord directly (which gets synced to slack).
-
-## Brand colors
-
-The Discord cards the bot posts in the mod channel use the Convex brand colors. They are defined once, in
-`convex/brandColors.ts`:
-
-| Color | Hex | Used for |
-| --- | --- | --- |
-| Purple | `#8D2676` | A setting turned on or added, auto-tag notes, and "Message forwarded to support" cards |
-| Yellow | `#F3B01C` | A setting turned off, cleared or moved, and dry-run cards |
-| Red | `#EE342F` | Live moderation proposals |
-
-Code asks for a meaning (`CARD_COLOR.added`, `.removed`, `.danger`) and never a hex value, so changing a color is a
-one-line edit in that file.
