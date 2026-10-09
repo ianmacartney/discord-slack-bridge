@@ -8,6 +8,63 @@ My usecase is to mirror our "#support" forum in Discord into a Slack channel, so
 folks here don't have to periodically switch from Slack to Discord to scan, and
 which allows us to discuss and reference and search support threads in slack.
 
+## What the bot does
+
+- **Mirrors support threads to Slack** so the team can answer without watching Discord (see below).
+- **Classifies every message** with Jev (normal, needs help, spam, NSFW, job posts, piracy, harassment, …).
+- **Handles rule violations.** Spam, NSFW, job posts, piracy and `@everyone` / `@here` are deleted, the person is
+  timed out for a day, and a card in the mod channel offers Ban, Kick, Timeout (7 days), Warn and Dismiss.
+- **Forwards help requests.** A long, worried question in the chat channel gets 👀, its own post in the support
+  forum (quoting the message) and a reply linking to it. When the post is resolved, the original gets 👍.
+- **Auto-tags new support posts** with a type and an area. A card in the mod channel has Undo and Edit buttons.
+
+Moderation never acts on the server owner, admins, moderators or bots. Until `MODERATION_DRY_RUN` is set to `false`,
+it only records what it would do and says "(dry run)" on its cards.
+
+### Moderator commands
+
+Reply to someone's message with one of these. The command message is deleted and the result shows up in the mod
+channel.
+
+| Command | What it does | Needs |
+| --- | --- | --- |
+| `!forward` | Opens a support post from the message (any channel, no AI check) | Manage Messages |
+| `!ban r="reason" d=7` | Bans the author and deletes `d` days of their messages (0 to 7) | Ban Members |
+| `!timeout r="reason" t=1h` | Times the author out (`10m`, `1h`, `2d`, up to 28 days, default 1 hour) | Moderate Members |
+
+`r` is optional everywhere.
+
+### Slash commands
+
+| Command | What it does |
+| --- | --- |
+| `/modchannel set \| clear \| status` | The private channel for cards and logs (admins) |
+| `/forwardfrom set channel:#general to:#support` | Where help requests are watched and where their posts open. `clear`, `status` |
+| `/tags forum \| clear-forum` | The support forum that gets auto-tagged |
+| `/tags add name kind when emoji` | Adds a forum tag and tells Jev when to use it (`kind`: type or area) |
+| `/tags edit tag new_name when emoji` | Renames a tag, changes its emoji or when Jev uses it |
+| `/tags delete tag tag_2 … tag_5` | Removes up to five tags (names are suggested as you type) |
+| `/tags delete-all` | Removes every tag except Resolved, after you confirm |
+
+Every settings change posts a "Settings changed" card in the mod channel. All slash commands need Manage Messages,
+except `/modchannel` (Administrator).
+
+### Setting it up in a server
+
+1. Invite the bot with these permissions: View Channels, Send Messages, Send Messages in Threads, Create Posts, Read
+   Message History, Add Reactions, Embed Links, Manage Messages, Manage Threads, Manage Channels, Moderate Members,
+   Kick Members, Ban Members. Put its role above the members it should moderate.
+2. In the Developer Portal, turn on the **Message Content** and **Server Members** intents, and turn off **Public
+   Bot** so only you can add it.
+3. `/modchannel set channel:#mods`
+4. `/forwardfrom set channel:#general to:#support`
+5. `/tags forum channel:#support`, then `/tags add` for each tag Jev should use.
+
+### Confidence thresholds
+
+How sure Jev must be before the bot acts lives in `THRESHOLD_DEFAULTS` in `convex/violations.ts` (spam 0.95, other
+violations 0.9, help requests 0.8, tags 0.7).
+
 ## Installation
 
 ### 1. Convex backend
@@ -46,6 +103,23 @@ export AUTO_REPLY_CHANNEL_ID=1088161997662724167 # for us in prod rn
 export DISCORD_RESOLVED_TAG_ID=1088163249410818230 # for us in prod rn
 npm run discordBot
 ```
+
+The bot needs Node 20 or newer.
+
+**Convex environment variables** (set them in the dashboard; the deploy fails without the required ones):
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `CONVEX_API_TOKEN` | yes | Shared secret the bot sends with every call |
+| `DISCORD_TOKEN` | yes | Bot token, for the actions that post and moderate |
+| `DISCORD_RESOLVED_TAG_ID` | yes | The forum tag the Resolve button applies |
+| `SLACK_TOKEN` | yes | Slack bot token |
+| `MODERATION_DRY_RUN` | no | Set to `false` to let moderation really act. Anything else is dry-run |
+| `MOD_CHANNEL_ID` | no | Fallback mod channel when `/modchannel` isn't set |
+| `MODERATION_EXEMPT_USER_IDS` | no | Comma-separated user ids moderation never touches |
+| `MODERATION_ALLOW_BOT_TARGETS` | no | `true` only for testing with bot accounts as targets |
+| `AUTO_REPLY_CHANNEL_ID` | no | Support forum for the auto-reply on new posts |
+| `ALGOLIA_API_KEY`, `VERIFICATION_*` | no | Search indexing and account verification (below) |
 
 **In Docker:**
 
@@ -196,8 +270,8 @@ The Discord cards the bot posts in the mod channel use the Convex brand colors. 
 
 | Color | Hex | Used for |
 | --- | --- | --- |
-| Purple | `#8D2676` | A setting turned on or added, auto-tag notes, and friendly info cards (the needs-help follow-up) |
-| Yellow | `#F3B01C` | A setting turned off, cleared or moved, dry-run proposals, and slow-down notices |
+| Purple | `#8D2676` | A setting turned on or added, auto-tag notes, and "Message forwarded to support" cards |
+| Yellow | `#F3B01C` | A setting turned off, cleared or moved, and dry-run cards |
 | Red | `#EE342F` | Live moderation proposals |
 
 Code asks for a meaning (`CARD_COLOR.added`, `.removed`, `.danger`) and never a hex value, so changing a color is a
