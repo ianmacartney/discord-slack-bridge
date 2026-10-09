@@ -3,51 +3,6 @@ import { v } from "convex/values";
 import { env, internalQuery } from "./_generated/server";
 import { apiMutation, apiQuery } from "./apiFunctions";
 
-const settings = v.object({
-  vipChannelId: v.union(v.string(), v.null()),
-  linkAllowedRoleIds: v.array(v.string()),
-});
-
-export const get = apiQuery({
-  args: { guildId: v.string() },
-  returns: settings,
-  handler: async ({ db }, { guildId }) => {
-    const row = await db
-      .query("guildSettings")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .unique();
-    return {
-      vipChannelId: row?.vipChannelId ?? null,
-      linkAllowedRoleIds: row?.linkAllowedRoleIds ?? [],
-    };
-  },
-});
-
-export const set = apiMutation({
-  args: { guildId: v.string(), ...settings.fields },
-  returns: v.null(),
-  handler: async ({ db }, { guildId, vipChannelId, linkAllowedRoleIds }) => {
-    const row = await db
-      .query("guildSettings")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .unique();
-
-    if (row) {
-      await db.patch("guildSettings", row._id, {
-        vipChannelId,
-        linkAllowedRoleIds,
-      });
-    } else {
-      await db.insert("guildSettings", {
-        guildId,
-        vipChannelId,
-        linkAllowedRoleIds,
-      });
-    }
-    return null;
-  },
-});
-
 export const getTagForum = apiQuery({
   args: { guildId: v.string() },
   returns: v.union(v.string(), v.null()),
@@ -74,8 +29,6 @@ export const setTagForum = apiMutation({
       await db.insert("guildSettings", {
         guildId,
         tagForumId,
-        vipChannelId: null,
-        linkAllowedRoleIds: [],
       });
     }
     return null;
@@ -108,8 +61,6 @@ export const setModChannel = apiMutation({
       await db.insert("guildSettings", {
         guildId,
         modChannelId,
-        vipChannelId: null,
-        linkAllowedRoleIds: [],
       });
     }
     return null;
@@ -174,8 +125,6 @@ export const setForwardFrom = apiMutation({
         guildId,
         forwardFromChannelId,
         forwardToForumId,
-        vipChannelId: null,
-        linkAllowedRoleIds: [],
       });
     }
     return null;

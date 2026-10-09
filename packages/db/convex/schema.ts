@@ -176,14 +176,9 @@ export const ModerationActions = Table("moderationActions", {
   deleteMessageDays: v.optional(v.number()),
 });
 
-// Per-server settings: the support forum to auto-tag (/tags), the mod channel and the ask-ai channel.
-// vipChannelId and linkAllowedRoleIds are unused and kept so existing rows stay valid.
+// Per-server settings: the support forum to auto-tag (/tags), the mod channel and the forwarding channels.
 export const GuildSettings = Table("guildSettings", {
   guildId: v.string(),
-  // Anyone who can view this channel may post links.
-  vipChannelId: nullable(v.string()),
-  // Roles allowed to post links, in addition to the VIP channel's viewers.
-  linkAllowedRoleIds: v.array(v.string()),
   // The support forum whose new posts get auto-tagged, set with the bot's /tags command. Unset: no auto-tagging.
   tagForumId: v.optional(nullable(v.string())),
   // Private channel for mod-only posts (auto-tag notes with Undo, moderation proposals), set with /modchannel.
