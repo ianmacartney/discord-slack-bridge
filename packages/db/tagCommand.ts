@@ -3,7 +3,10 @@
 import type { ConvexHttpClient } from "convex/browser";
 import { ConvexError } from "convex/values";
 import {
+  ActionRowBuilder,
   AutocompleteInteraction,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   ChatInputCommandInteraction,
   ForumChannel,
@@ -129,6 +132,11 @@ export const tagsCommand = new SlashCommandBuilder()
       .addStringOption((o) =>
         o.setName("tag_5").setDescription("Another tag").setAutocomplete(true),
       ),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName("delete-all")
+      .setDescription("Remove every tag except Resolved (asks you to confirm)"),
   );
 
 export async function registerTagsCommand(guild: Guild) {
@@ -351,6 +359,80 @@ async function deleteTags(
   );
 }
 
+// The Resolve button applies this tag, so delete-all keeps it.
+const resolvedTagId = process.env.DISCORD_RESOLVED_TAG_ID;
+const CONFIRM_SECONDS = 30;
+
+/** Deletes every forum tag except Resolved and stops Jev using any tag, after the moderator confirms. */
+async function deleteAllTags(
+  interaction: ChatInputCommandInteraction,
+  guild: Guild,
+  convex: ConvexHttpClient,
+  apiToken: string,
+) {
+  const forum = await autoTagForum(guild, convex, apiToken);
+  const tags = currentTags(forum);
+  const keep = tags.filter((t) => t.id === resolvedTagId);
+  const remove = tags.filter((t) => t.id !== resolvedTagId);
+  const { type, area } = await convex.query(api.tagRules.list, {
+    guildId: guild.id,
+    apiToken,
+  });
+  const rules = [
+    ...type.map((d) => ({ ...d, kind: "type" as const })),
+    ...area.map((d) => ({ ...d, kind: "area" as const })),
+  ].filter((d) => d.tag);
+  if (remove.length === 0 && rules.length === 0) {
+    throw new UserError("There are no tags to delete.");
+  }
+
+  const reply = await interaction.editReply({
+    content: `Delete all ${remove.length} tags from <#${forum.id}>${keep.length ? " (Resolved stays)" : ""}? Jev will stop tagging until you add tags again. Posts lose these tags too.`,
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("confirm")
+          .setLabel("Delete all")
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId("cancel")
+          .setLabel("Cancel")
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    ],
+  });
+  const click = await reply
+    .awaitMessageComponent({
+      time: CONFIRM_SECONDS * 1000,
+      filter: (i) => i.user.id === interaction.user.id,
+    })
+    .catch(() => null);
+  if (!click || click.customId !== "confirm") {
+    await interaction.editReply({
+      content: "Nothing was deleted.",
+      components: [],
+    });
+    return null;
+  }
+  await click.update({ content: "Deleting…", components: [] });
+
+  if (remove.length) {
+    await forum.setAvailableTags(
+      keep,
+      `Deleted by ${interaction.user.tag} with /tags delete-all`,
+    );
+  }
+  for (const d of rules) {
+    await convex.mutation(api.tagRules.remove, {
+      guildId: guild.id,
+      kind: d.kind,
+      name: d.tag!,
+      apiToken,
+    });
+  }
+  return `Deleted all ${remove.length} tags from <#${forum.id}>${keep.length ? ", kept Resolved" : ""}. Jev won't tag posts until tags are added again.`;
+}
+
 /**
  * Suggestions for the `tag` option of /tags edit and delete: the support forum's tags plus the ones Jev knows about,
  * filtered by what's typed so far. Discord shows at most 25.
@@ -419,10 +501,14 @@ export async function handleTagsCommand(
       change = await addTag(interaction, guild, convex, apiToken);
     } else if (sub === "edit") {
       change = await editTag(interaction, guild, convex, apiToken);
-    } else {
+    } else if (sub === "delete") {
       change = await deleteTags(interaction, guild, convex, apiToken);
+    } else {
+      const done = await deleteAllTags(interaction, guild, convex, apiToken);
+      if (!done) return;
+      change = done;
     }
-    await interaction.editReply(change);
+    await interaction.editReply({ content: change, components: [] });
     await announceToMods(guild, interaction, change, convex, apiToken);
   } catch (e) {
     if (e instanceof UserError) {
