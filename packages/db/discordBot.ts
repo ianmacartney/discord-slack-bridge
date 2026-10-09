@@ -29,12 +29,7 @@ import {
   handleModChannelCommand,
   registerModChannelCommand,
 } from "./modChannelCommand.js";
-import {
-  handleTagsCommand,
-  handleTagsSetupCommand,
-  registerTagsCommand,
-  registerTagsSetupCommand,
-} from "./tagCommand.js";
+import { handleTagsCommand, registerTagsCommand } from "./tagCommand.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -82,11 +77,6 @@ bot.on("ready", async () => {
       await registerTagsCommand(guild);
     } catch (e) {
       console.error(`Could not register /tags in ${guild.name}:`, e);
-    }
-    try {
-      await registerTagsSetupCommand(guild);
-    } catch (e) {
-      console.error(`Could not register /tags-setup in ${guild.name}:`, e);
     }
     try {
       await registerModChannelCommand(guild);
@@ -297,15 +287,6 @@ bot.on("interactionCreate", async (interaction) => {
     interaction.commandName === "modchannel"
   ) {
     await handleModChannelCommand(interaction, convex, apiToken);
-    return;
-  }
-
-  // Admins only: creates the forum tags the auto-tagger uses.
-  if (
-    interaction.isChatInputCommand() &&
-    interaction.commandName === "tags-setup"
-  ) {
-    await handleTagsSetupCommand(interaction, convex, apiToken);
     return;
   }
 

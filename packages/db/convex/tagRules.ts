@@ -194,23 +194,3 @@ export const remove = apiMutation({
     return defs[key].tag!;
   },
 });
-
-/** Goes back to the built-in text for one definition (or removes one the server added). */
-export const reset = apiMutation({
-  args: { guildId: v.string(), kind: kindValidator, name: v.string() },
-  returns: v.string(),
-  handler: async ({ db }, { guildId, kind, name }) => {
-    const rows = await db
-      .query("tagRules")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .take(MAX_RULES * 2);
-    const match = rows.find(
-      (r) =>
-        r.kind === kind &&
-        (r.key === name || normalize(r.tag) === normalize(name)),
-    );
-    if (!match) throw new ConvexError(`Nothing to reset for "${name}".`);
-    await db.delete("tagRules", match._id);
-    return match.tag;
-  },
-});

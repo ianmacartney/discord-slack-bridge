@@ -1,6 +1,6 @@
 // Tags a post in the support forum with two independent Jev decisions: what KIND of post it is, and which AREA it's
-// about. The forum is the one a moderator chose with the bot's /tags command. It runs when a post is created, and
-// again only when a moderator runs /tags retag. Jev only picks among the definitions in tagDefinitions.ts, and each
+// about. The forum is the one a moderator chose with the bot's /tags command. It runs once, when a post is created.
+// Jev only picks among the tags set up with /tags add (plus the built-in ones in tagDefinitions.ts), and each
 // pick maps to a tag that must already exist in the forum (matched by name, ignoring case, emoji and punctuation).
 // Anything unsure or unmatched is left untagged. Every decision is logged in `tagDecisions`.
 import { Infer, v } from "convex/values";
@@ -21,7 +21,6 @@ import { normalize, type Definition } from "./tagDefinitions";
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_MESSAGE_CHARS = 2000;
 // Jev's confidence says how concentrated its answer is. Below the "tag" threshold, a question adds no tag.
-const AUDIT_STATS_WINDOW = 100;
 
 const criteria = (definitions: Record<string, Definition>) =>
   Object.fromEntries(
@@ -304,21 +303,6 @@ export const tagNewPost = internalAction({
   },
 });
 
-/** A moderator's /tags retag: decide again from the post's current content. */
-export const retagThread = internalAction({
-  args: { threadId: v.id("threads"), triggeredBy: v.string() },
-  returns: v.null(),
-  handler: async (ctx, { threadId, triggeredBy }): Promise<null> => {
-    await tagThread(ctx, threadId, {
-      preview: false,
-      trigger: "retag",
-      force: true,
-      triggeredBy,
-    });
-    return null;
-  },
-});
-
 /** By hand: `npx convex run tags:tagThreadNow '{"threadId": "...", "preview": true}'`. Preview applies nothing. */
 export const tagThreadNow = internalAction({
   args: { threadId: v.id("threads"), preview: v.optional(v.boolean()) },
@@ -335,26 +319,6 @@ export const tagThreadNow = internalAction({
 });
 
 // The functions below are called by the Discord bot process (it passes CONVEX_API_TOKEN).
-
-/** Bot: a moderator ran /tags retag inside a post. */
-export const requestRetag = apiMutation({
-  args: { discordThreadId: v.string(), triggeredBy: v.string() },
-  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
-  handler: async (ctx, { discordThreadId, triggeredBy }) => {
-    const thread = await ctx.db
-      .query("threads")
-      .withIndex("id", (q) => q.eq("id", discordThreadId))
-      .unique();
-    if (!thread) {
-      return { ok: false, reason: "I haven't seen this post yet." };
-    }
-    await ctx.scheduler.runAfter(0, internal.tags.retagThread, {
-      threadId: thread._id,
-      triggeredBy,
-    });
-    return { ok: true };
-  },
-});
 
 /** Bot: a moderator pressed Undo on a mod-channel note. Removes the tags the bot set for that decision. */
 export const undoDecision = apiMutation({
@@ -413,58 +377,7 @@ export const recordEdit = apiMutation({
   },
 });
 
-const auditRow = v.object({
-  discordThreadId: v.string(),
-  trigger: v.string(),
-  status: v.string(),
-  tags: v.array(v.object({ name: v.string(), confidence: v.number() })),
-  // Why nothing was applied, when that's the case (for example a missing forum tag).
-  notes: v.array(v.string()),
-});
-
-/** Bot: /tags audit. The latest decisions for a server, plus how often moderators corrected the bot. */
-export const recentDecisions = apiQuery({
-  args: { guildId: v.string(), limit: v.number() },
-  returns: v.object({
-    rows: v.array(auditRow),
-    stats: v.object({
-      total: v.number(),
-      applied: v.number(),
-      undone: v.number(),
-      superseded: v.number(),
-      edited: v.number(),
-    }),
-  }),
-  handler: async ({ db }, { guildId, limit }) => {
-    const latest = await db
-      .query("tagDecisions")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .order("desc")
-      .take(AUDIT_STATS_WINDOW);
-    const count = (status: string) =>
-      latest.filter((d) => d.status === status).length;
-    return {
-      rows: latest.slice(0, Math.min(limit, 20)).map((d) => ({
-        discordThreadId: d.discordThreadId,
-        trigger: d.trigger,
-        status: d.status,
-        tags: d.decisions.flatMap((x) =>
-          x.tag ? [{ name: x.tag, confidence: x.confidence }] : [],
-        ),
-        notes: d.decisions.flatMap((x) => (x.note ? [x.note] : [])),
-      })),
-      stats: {
-        total: latest.length,
-        applied: count("applied"),
-        undone: count("undone"),
-        superseded: count("superseded"),
-        edited: latest.filter((d) => d.editedBy).length,
-      },
-    };
-  },
-});
-
-/** Bot: /tags status. The mod channel notes go to, if any. */
+/** Bot: the mod channel that cards and notes go to, if any. */
 export const tagStatus = apiQuery({
   args: { guildId: v.string() },
   returns: v.object({ modChannelId: v.union(v.string(), v.null()) }),
