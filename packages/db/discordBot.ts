@@ -15,6 +15,7 @@ import { api } from "./convex/_generated/api.js";
 import { CARD_COLOR } from "./convex/brandColors.js";
 import type { Id } from "./convex/_generated/dataModel.js";
 import { handleAskAiCommand, registerAskAiCommand } from "./askAiCommand.js";
+import { handleModText } from "./modCommands.js";
 import {
   handleForwardFromCommand,
   handleForwardText,
@@ -111,9 +112,10 @@ bot.on("ready", async () => {
 });
 
 bot.on("messageCreate", async (msg) => {
-  // Moderators reply to a message with "!forward" to open a support post from it (see forwardFromCommand.ts).
+  // Moderators reply to a message with "!forward", "!ban ..." or "!timeout ..." (see forwardFromCommand.ts, modCommands.ts).
   // The commands themselves aren't stored.
   if (await handleForwardText(msg, convex, apiToken)) return;
+  if (await handleModText(msg, convex, apiToken)) return;
   let channel, thread;
   if (
     (msg.channel.type === ChannelType.PublicThread ||

@@ -172,6 +172,8 @@ export const ModerationActions = Table("moderationActions", {
   note: v.optional(v.string()),
   // The mod-channel card this action belongs to, if any. The card reports on it, so it is not logged separately.
   alertId: v.optional(v.id("modAlerts")),
+  // Ban only: days of the person's recent messages Discord deletes with the ban (0 to 7).
+  deleteMessageDays: v.optional(v.number()),
 });
 
 // Per-server settings: the support forum to auto-tag (/tags), the mod channel and the ask-ai channel.

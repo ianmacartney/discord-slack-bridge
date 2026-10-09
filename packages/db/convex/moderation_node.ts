@@ -192,7 +192,8 @@ async function logAutoAction(
   outcome: "executed" | "dry_run" | "skipped",
   note?: string,
 ) {
-  if (!action.auto) return;
+  const fromChatCommand = action.category === "chat_command";
+  if (!action.auto && !fromChatCommand) return;
   // A card (postAlertCard) reports on these, so only a skip needs its own log line.
   if (action.alertId && outcome !== "skipped") return;
   try {
@@ -206,7 +207,7 @@ async function logAutoAction(
     const embed = new EmbedBuilder()
       .setColor(OUTCOME_CARD[outcome].color)
       .setTitle(
-        `Automatic ${action.action}${OUTCOME_CARD[outcome].titleSuffix}`,
+        `${fromChatCommand ? "Moderator" : "Automatic"} ${action.action}${OUTCOME_CARD[outcome].titleSuffix}`,
       )
       .addFields(
         {
@@ -222,6 +223,18 @@ async function logAutoAction(
                 inline: true,
               },
             ]
+          : []),
+        ...(action.deleteMessageDays
+          ? [
+              {
+                name: "Messages deleted",
+                value: `Last ${action.deleteMessageDays} day(s)`,
+                inline: true,
+              },
+            ]
+          : []),
+        ...(fromChatCommand && action.decidedBy
+          ? [{ name: "By", value: `<@${action.decidedBy}>`, inline: true }]
           : []),
         { name: "Reason", value: action.reason },
       )
@@ -283,7 +296,7 @@ export const execute = internalAction({
         await logAutoAction(ctx, bot, guild, action, "skipped", blocked);
         return await finish("skipped", blocked);
       }
-      if (action.action !== "delete" && !member)
+      if (action.action !== "delete" && action.action !== "ban" && !member)
         return await finish("skipped", "target is no longer in the server");
 
       const needed = ACTION_PERMISSION[action.action];
@@ -326,7 +339,11 @@ export const execute = internalAction({
       } else if (action.action === "kick") {
         await member!.kick(reason);
       } else {
-        await member!.ban({ reason });
+        // guild.bans works whether or not they are still in the server.
+        await guild.bans.create(action.targetDiscordUserId, {
+          reason,
+          deleteMessageSeconds: (action.deleteMessageDays ?? 0) * 24 * 60 * 60,
+        });
       }
       await postAlertCard(ctx, bot, guild, action, "executed");
       await logAutoAction(ctx, bot, guild, action, "executed");

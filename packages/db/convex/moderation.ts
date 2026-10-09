@@ -20,15 +20,13 @@ import {
   VIOLATION_TITLES,
 } from "./violations";
 import { loadThresholds } from "./thresholds";
+import { literals } from "convex-helpers/validators";
 
-// Confidence thresholds are in violations.ts (THRESHOLD_DEFAULTS) and can be changed with /confidence.
 const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
-// A person who just triggered a card gets later messages deleted, but no second timeout and no second card.
 const ALERT_DEDUPE_MS = 10 * 60 * 1000;
 
-/** Dry-run unless MODERATION_DRY_RUN is exactly "false". */
 export const isDryRun = () => env.MODERATION_DRY_RUN !== "false";
 
 export const get = internalQuery({
@@ -44,13 +42,7 @@ export const get = internalQuery({
 export const setResult = internalMutation({
   args: {
     actionId: v.id("moderationActions"),
-    status: v.union(
-      v.literal("rejected"),
-      v.literal("executed"),
-      v.literal("dry_run"),
-      v.literal("skipped"),
-      v.literal("failed"),
-    ),
+    status: literals("rejected", "executed", "dry_run", "skipped", "failed"),
     note: v.optional(v.string()),
   },
   returns: v.null(),
@@ -362,13 +354,7 @@ async function approveAndRun(
 export const decideAlert = apiMutation({
   args: {
     alertId: v.id("modAlerts"),
-    choice: v.union(
-      v.literal("ban"),
-      v.literal("kick"),
-      v.literal("timeout"),
-      v.literal("warn"),
-      v.literal("dismiss"),
-    ),
+    choice: literals("ban", "kick", "timeout", "warn", "dismiss"),
     decidedBy: v.string(),
   },
   returns: v.object({
@@ -415,5 +401,36 @@ export const decideAlert = apiMutation({
       handledAction: choice,
     });
     return { ok: true, status: "handled", dryRun: isDryRun() };
+  },
+});
+
+/**
+ * Bot: a moderator replied to a message with !ban or !timeout. Runs like a card's buttons: the safety checks in
+ * moderation_node.ts still apply (never staff, the owner, bots or anyone ranked at or above the bot), and so does dry-run.
+ */
+export const actFromChat = apiMutation({
+  args: {
+    action: literals("ban", "timeout"),
+    targetDiscordUserId: v.string(),
+    channelId: v.string(),
+    discordMessageId: v.string(),
+    reason: v.string(),
+    durationMinutes: v.optional(v.number()),
+    deleteMessageDays: v.optional(v.number()),
+    decidedBy: v.string(),
+  },
+  returns: v.object({ dryRun: v.boolean() }),
+  handler: async (ctx, args) => {
+    const actionId = await ctx.db.insert("moderationActions", {
+      ...args,
+      auto: false,
+      status: "approved",
+      dryRun: isDryRun(),
+      category: "chat_command",
+    });
+    await ctx.scheduler.runAfter(0, internal.moderation_node.execute, {
+      actionId,
+    });
+    return { dryRun: isDryRun() };
   },
 });
