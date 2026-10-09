@@ -31,7 +31,6 @@ import type * as tagDefinitions from "../tagDefinitions.js";
 import type * as tagRules from "../tagRules.js";
 import type * as tags from "../tags.js";
 import type * as tags_node from "../tags_node.js";
-import type * as thresholds from "../thresholds.js";
 import type * as tickets from "../tickets.js";
 import type * as users from "../users.js";
 import type * as utils from "../utils.js";
@@ -69,7 +68,6 @@ declare const fullApi: ApiFromModules<{
   tagRules: typeof tagRules;
   tags: typeof tags;
   tags_node: typeof tags_node;
-  thresholds: typeof thresholds;
   tickets: typeof tickets;
   users: typeof users;
   utils: typeof utils;

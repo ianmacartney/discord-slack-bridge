@@ -15,11 +15,11 @@ import { ModAlerts, moderationActionKind } from "./schema";
 import {
   CLASSIFIED_VIOLATIONS,
   MOD_TIMEOUT_MINUTES,
+  THRESHOLD_DEFAULTS,
   ThresholdName,
   VIOLATION_TIMEOUT_MINUTES,
   VIOLATION_TITLES,
 } from "./violations";
-import { loadThresholds } from "./thresholds";
 import { literals } from "convex-helpers/validators";
 
 const PROPOSED_TIMEOUT_MINUTES = 60;
@@ -181,7 +181,7 @@ export const applyPolicy = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { messageId, category, confidence = 0 }) => {
-    const min = await loadThresholds(ctx.db);
+    const min = THRESHOLD_DEFAULTS;
     if (
       (CLASSIFIED_VIOLATIONS as readonly string[]).includes(category) &&
       confidence >= min[category as ThresholdName]

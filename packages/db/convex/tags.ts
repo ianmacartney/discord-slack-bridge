@@ -15,6 +15,7 @@ import {
 } from "./_generated/server";
 import { apiMutation, apiQuery } from "./apiFunctions";
 import { decide } from "./decisions";
+import { THRESHOLD_DEFAULTS } from "./violations";
 import { TagDecisions } from "./schema";
 import { normalize, type Definition } from "./tagDefinitions";
 
@@ -190,7 +191,7 @@ async function tagThread(
       return null;
   }
 
-  const MIN_TAG_CONFIDENCE = (await ctx.runQuery(internal.thresholds.all)).tag;
+  const MIN_TAG_CONFIDENCE = THRESHOLD_DEFAULTS.tag;
   // The built-in definitions plus whatever moderators changed with /tags rule.
   const { type: POST_TYPES, area: POST_AREAS } = await ctx.runQuery(
     internal.tagRules.forGuild,

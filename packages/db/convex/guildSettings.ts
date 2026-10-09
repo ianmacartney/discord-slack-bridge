@@ -131,55 +131,6 @@ export const modChannelFor = internalQuery({
   },
 });
 
-export const getAskAiChannel = apiQuery({
-  args: { guildId: v.string() },
-  returns: v.union(v.string(), v.null()),
-  handler: async ({ db }, { guildId }) => {
-    const row = await db
-      .query("guildSettings")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .unique();
-    return row?.askAiChannelId ?? null;
-  },
-});
-
-export const setAskAiChannel = apiMutation({
-  args: { guildId: v.string(), askAiChannelId: v.union(v.string(), v.null()) },
-  returns: v.null(),
-  handler: async ({ db }, { guildId, askAiChannelId }) => {
-    const row = await db
-      .query("guildSettings")
-      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-      .unique();
-    if (row) {
-      await db.patch("guildSettings", row._id, { askAiChannelId });
-    } else {
-      await db.insert("guildSettings", {
-        guildId,
-        askAiChannelId,
-        vipChannelId: null,
-        linkAllowedRoleIds: [],
-      });
-    }
-    return null;
-  },
-});
-
-/** For server code: the ask-ai channel for a server, from /askai, else the ASK_AI_CHANNEL_ID env var, else null. */
-export const askAiChannelFor = internalQuery({
-  args: { guildId: v.union(v.string(), v.null()) },
-  returns: v.union(v.string(), v.null()),
-  handler: async ({ db }, { guildId }) => {
-    const row = guildId
-      ? await db
-          .query("guildSettings")
-          .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-          .unique()
-      : null;
-    return row?.askAiChannelId ?? env.ASK_AI_CHANNEL_ID ?? null;
-  },
-});
-
 export const getForwardFrom = apiQuery({
   args: { guildId: v.string() },
   returns: v.object({

@@ -5,6 +5,7 @@ import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalQuery } from "./_generated/server";
 import { decide } from "./decisions";
+import { THRESHOLD_DEFAULTS } from "./violations";
 
 const MAX_MESSAGE_CHARS = 4000;
 
@@ -71,7 +72,6 @@ export const classifyMessage = internalAction({
     ctx,
     { messageId },
   ): Promise<Infer<typeof messageClassification> | null> => {
-
     const message: Infer<typeof messageForClassification> | null =
       await ctx.runQuery(internal.classify.getMessageForClassification, {
         messageId,
@@ -106,11 +106,10 @@ export const classifyMessage = internalAction({
       category: answer.choice,
       confidence: answer.confidence,
     });
-    const thresholds = await ctx.runQuery(internal.thresholds.all);
     // Long help requests in the /forwardfrom channel get their own support-forum post (guards live in followup.ts).
     if (
       answer.choice === "needs_help" &&
-      (answer.confidence ?? 0) >= thresholds.needs_help
+      (answer.confidence ?? 0) >= THRESHOLD_DEFAULTS.needs_help
     ) {
       await ctx.scheduler.runAfter(0, internal.followup_node.forwardToSupport, {
         messageId,

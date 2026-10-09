@@ -14,8 +14,6 @@ const app = defineApp({
     VERIFICATION_ROLE_ID: v.optional(v.string()),
     VERIFICATION_WEBHOOK_TOKEN: v.optional(v.string()),
     AUTO_REPLY_CHANNEL_ID: v.optional(v.string()),
-    // Fallback for the ask-ai channel mentioned in the needs-help follow-up. Prefer the /askai command.
-    ASK_AI_CHANNEL_ID: v.optional(v.string()),
     MODERATION_DRY_RUN: v.optional(v.string()),
     MOD_CHANNEL_ID: v.optional(v.string()),
     MODERATION_EXEMPT_USER_IDS: v.optional(v.string()),

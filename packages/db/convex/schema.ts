@@ -188,8 +188,6 @@ export const GuildSettings = Table("guildSettings", {
   tagForumId: v.optional(nullable(v.string())),
   // Private channel for mod-only posts (auto-tag notes with Undo, moderation proposals), set with /modchannel.
   modChannelId: v.optional(nullable(v.string())),
-  // Where people can get a quick AI answer first (the ask-ai channel), set with /askai. Mentioned in the follow-up.
-  askAiChannelId: v.optional(nullable(v.string())),
   // The chat channel (usually #general) whose long help requests are forwarded to the support forum, set with /forwardfrom.
   forwardFromChannelId: v.optional(nullable(v.string())),
   // The support forum those requests are opened in, set with /forwardfrom. Unset: the /tags forum.
@@ -246,13 +244,6 @@ export const TagDecisions = Table("tagDecisions", {
   editedBy: v.optional(v.string()),
 });
 
-// Confidence cut-offs changed with /confidence. They apply to the whole bot, because messages don't record their
-// server. A missing row means the default in THRESHOLD_DEFAULTS (violations.ts).
-export const Thresholds = Table("thresholds", {
-  name: v.string(),
-  value: v.number(),
-});
-
 // Changes a server made to the auto-tagger's definitions (see tagDefinitions.ts) with /tags rule. A row with the key
 // of a built-in definition overrides it, or hides it when `removed` is true. Any other key is a definition the
 // server added.
@@ -280,7 +271,6 @@ export default defineSchema({
     .index("by_discordMessageId", ["discordMessageId"])
     .index("by_discordThreadId", ["discordThreadId"]),
   tagRules: TagRules.table.index("by_guildId", ["guildId"]),
-  thresholds: Thresholds.table.index("by_name", ["name"]),
   modAlerts: ModAlerts.table.index("by_targetDiscordUserId", [
     "targetDiscordUserId",
   ]),

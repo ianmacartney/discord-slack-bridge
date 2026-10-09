@@ -8,7 +8,7 @@ export const VIOLATION_TIMEOUT_MINUTES = 24 * 60;
 export const MOD_TIMEOUT_MINUTES = 7 * 24 * 60;
 
 /**
- * How confident Jev must be before the bot acts. Moderators change these with /confidence (see thresholds.ts).
+ * How confident Jev must be before the bot acts.
  * The first four are the violations that get the full treatment (delete, timeout, card).
  */
 export const THRESHOLD_DEFAULTS = {

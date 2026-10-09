@@ -14,17 +14,12 @@ import {
 import { api } from "./convex/_generated/api.js";
 import { CARD_COLOR } from "./convex/brandColors.js";
 import type { Id } from "./convex/_generated/dataModel.js";
-import { handleAskAiCommand, registerAskAiCommand } from "./askAiCommand.js";
 import { handleModText } from "./modCommands.js";
 import {
   handleForwardFromCommand,
   handleForwardText,
   registerForwardFromCommand,
 } from "./forwardFromCommand.js";
-import {
-  handleConfidenceCommand,
-  registerConfidenceCommand,
-} from "./confidenceCommand.js";
 import {
   handleModChannelCommand,
   registerModChannelCommand,
@@ -84,19 +79,9 @@ bot.on("ready", async () => {
       console.error(`Could not register /modchannel in ${guild.name}:`, e);
     }
     try {
-      await registerConfidenceCommand(guild);
-    } catch (e) {
-      console.error(`Could not register /confidence in ${guild.name}:`, e);
-    }
-    try {
       await registerForwardFromCommand(guild);
     } catch (e) {
       console.error(`Could not register /forwardfrom in ${guild.name}:`, e);
-    }
-    try {
-      await registerAskAiCommand(guild);
-    } catch (e) {
-      console.error(`Could not register /askai in ${guild.name}:`, e);
     }
   }
 });
@@ -259,25 +244,11 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Moderators choose the ask-ai channel mentioned in the needs-help follow-up.
-  if (
-    interaction.isChatInputCommand() &&
-    interaction.commandName === "confidence"
-  ) {
-    await handleConfidenceCommand(interaction, convex, apiToken);
-    return;
-  }
-
   if (
     interaction.isChatInputCommand() &&
     interaction.commandName === "forwardfrom"
   ) {
     await handleForwardFromCommand(interaction, convex, apiToken);
-    return;
-  }
-
-  if (interaction.isChatInputCommand() && interaction.commandName === "askai") {
-    await handleAskAiCommand(interaction, convex, apiToken);
     return;
   }
 

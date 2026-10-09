@@ -31,7 +31,6 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly ALGOLIA_API_KEY: string | undefined;
-  readonly ASK_AI_CHANNEL_ID: string | undefined;
   readonly AUTO_REPLY_CHANNEL_ID: string | undefined;
   readonly CONVEX_API_TOKEN: string;
   readonly DISCORD_RESOLVED_TAG_ID: string;
