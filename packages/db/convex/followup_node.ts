@@ -19,7 +19,7 @@ const MAX_MESSAGE = 2000;
 /**
  * A needs_help message in the /forwardfrom channel: if Jev thinks it's a detailed problem worth a thread, the bot reacts
  * 👀, opens a support-forum post that quotes the message and replies with a link to the post. One post per person every
- * 30 minutes.
+ * 5 minutes.
  */
 export const forwardToSupport = internalAction({
   args: { messageId: v.id("messages") },

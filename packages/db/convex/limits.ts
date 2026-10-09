@@ -2,11 +2,11 @@ import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "./_generated/api";
 
 const limiter = new RateLimiter(components.rateLimiter, {
-  // One forwarded support post per person every 30 minutes, so the bot doesn't overdo it.
+  // One forwarded support post per person every 5 minutes, so the bot doesn't overdo it.
   helpFollowUp: {
     kind: "token bucket",
     rate: 1,
-    period: 30 * MINUTE,
+    period: 5 * MINUTE,
     capacity: 1,
   },
 });
