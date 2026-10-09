@@ -12,7 +12,6 @@ import {
   env,
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
-import { limitPerPerson } from "./limits";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -188,22 +187,6 @@ export const receiveMessage = apiMutation({
       await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
         messageId,
       });
-    }
-
-    // Per-person speed limit: a person posting faster than limits.ts allows gets a "slow down" reply.
-    if (!author.bot && (message.type === 0 || message.type === 19)) {
-      const speed = await limitPerPerson(ctx, "messageFlood", author.id);
-      if (!speed.ok) {
-        await ctx.scheduler.runAfter(0, internal.slowdown_node.sendSlowDown, {
-          messageId,
-        });
-        // ...and an hour's timeout. Dry-run and the safety checks decide whether it really happens.
-        await ctx.scheduler.runAfter(
-          0,
-          internal.moderation.timeoutForFlooding,
-          { messageId },
-        );
-      }
     }
 
     // Classify ordinary messages (0: DEFAULT, 19: REPLY) with Jev. The verdict is only logged for now.

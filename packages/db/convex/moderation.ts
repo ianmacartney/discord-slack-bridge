@@ -268,47 +268,6 @@ export const alertMassMention = internalMutation({
   },
 });
 
-const FLOOD_TIMEOUT_MINUTES = 60;
-
-/**
- * Called when someone goes over the per-person message speed limit (limits.ts): time them out for an hour. It goes
- * through the same path as every other action, so dry-run mode and all the safety checks in moderation_node.ts apply
- * (never the owner, admins, moderators, bots, exempt users, or anyone ranked at or above the bot). At most one flood
- * timeout per person per hour.
- */
-export const timeoutForFlooding = internalMutation({
-  args: { messageId: v.id("messages") },
-  returns: v.null(),
-  handler: async (ctx, { messageId }) => {
-    const message = await ctx.db.get("messages", messageId);
-    if (!message) return null;
-    const [author, channel, thread] = await Promise.all([
-      ctx.db.get("users", message.authorId),
-      ctx.db.get("channels", message.channelId),
-      message.threadId ? ctx.db.get("threads", message.threadId) : null,
-    ]);
-    if (!author || !channel || author.bot) return null;
-    const recent = await countRecent(
-      ctx,
-      author.id,
-      "timeout",
-      FLOOD_TIMEOUT_MINUTES * 60 * 1000,
-    );
-    if (recent > 0) return null;
-    await record(ctx, {
-      auto: true,
-      action: "timeout",
-      durationMinutes: FLOOD_TIMEOUT_MINUTES,
-      reason: "Posting messages too fast",
-      category: "flood",
-      targetDiscordUserId: author.id,
-      channelId: thread?.id ?? channel.id,
-      discordMessageId: message.id,
-    });
-    return null;
-  },
-});
-
 /** Manually propose any action (including ban) for a human to approve in the mod channel. */
 export const propose = internalMutation({
   args: {

@@ -9,20 +9,6 @@ const limiter = new RateLimiter(components.rateLimiter, {
     period: 30 * MINUTE,
     capacity: 1,
   },
-  // How fast one person may post: about one message every 6 seconds, with a burst of up to 6. Past that, the bot
-  messageFlood: {
-    kind: "token bucket",
-    rate: 10,
-    period: MINUTE,
-    capacity: 6,
-  },
-  // At most one "slow down" notice per person every 2 minutes, so the warning can't become spam itself.
-  slowDownNotice: {
-    kind: "token bucket",
-    rate: 1,
-    period: 2 * MINUTE,
-    capacity: 1,
-  },
 });
 
 type LimitName = keyof NonNullable<typeof limiter.limits>;;

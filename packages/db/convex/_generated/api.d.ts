@@ -27,8 +27,6 @@ import type * as moderation from "../moderation.js";
 import type * as moderation_node from "../moderation_node.js";
 import type * as slack from "../slack.js";
 import type * as slack_node from "../slack_node.js";
-import type * as slowdown from "../slowdown.js";
-import type * as slowdown_node from "../slowdown_node.js";
 import type * as tagDefinitions from "../tagDefinitions.js";
 import type * as tagRules from "../tagRules.js";
 import type * as tags from "../tags.js";
@@ -67,8 +65,6 @@ declare const fullApi: ApiFromModules<{
   moderation_node: typeof moderation_node;
   slack: typeof slack;
   slack_node: typeof slack_node;
-  slowdown: typeof slowdown;
-  slowdown_node: typeof slowdown_node;
   tagDefinitions: typeof tagDefinitions;
   tagRules: typeof tagRules;
   tags: typeof tags;
