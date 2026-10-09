@@ -108,13 +108,26 @@ export const tagsCommand = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s
       .setName("delete")
-      .setDescription("Remove a tag from the forum and stop Jev using it")
+      .setDescription("Remove tags from the forum and stop Jev using them")
       .addStringOption((o) =>
         o
           .setName("tag")
-          .setDescription("The tag to remove")
+          .setDescription("A tag to remove")
           .setAutocomplete(true)
           .setRequired(true),
+      )
+      // More tags to delete in the same go, each with the same suggestions.
+      .addStringOption((o) =>
+        o.setName("tag_2").setDescription("Another tag").setAutocomplete(true),
+      )
+      .addStringOption((o) =>
+        o.setName("tag_3").setDescription("Another tag").setAutocomplete(true),
+      )
+      .addStringOption((o) =>
+        o.setName("tag_4").setDescription("Another tag").setAutocomplete(true),
+      )
+      .addStringOption((o) =>
+        o.setName("tag_5").setDescription("Another tag").setAutocomplete(true),
       ),
   );
 
@@ -281,33 +294,61 @@ async function editTag(
   return `Updated the tag "${newName ?? tag.name}" in <#${forum.id}>.`;
 }
 
-async function deleteTag(
+async function deleteTags(
   interaction: ChatInputCommandInteraction,
   guild: Guild,
   convex: ConvexHttpClient,
   apiToken: string,
 ) {
   const forum = await autoTagForum(guild, convex, apiToken);
-  const name = interaction.options.getString("tag", true).trim();
+  const names = [
+    ...new Set(
+      ["tag", "tag_2", "tag_3", "tag_4", "tag_5"]
+        .map((option) => interaction.options.getString(option)?.trim())
+        .filter((name): name is string => !!name),
+    ),
+  ];
   const tags = currentTags(forum);
-  const tag = tags.find((t) => normalize(t.name) === normalize(name));
-  const kind = await kindOf(guild, name, convex, apiToken);
-  if (!tag && !kind) throw new UserError(`No tag named "${name}".`);
-  if (tag) {
+  const deleted: string[] = [];
+  const notFound: string[] = [];
+  const keep = new Set(tags);
+  for (const name of names) {
+    const tag = tags.find((t) => normalize(t.name) === normalize(name));
+    const kind = await kindOf(guild, name, convex, apiToken);
+    if (!tag && !kind) {
+      notFound.push(name);
+      continue;
+    }
+    if (tag) keep.delete(tag);
+    if (kind) {
+      await convex.mutation(api.tagRules.remove, {
+        guildId: guild.id,
+        kind,
+        name,
+        apiToken,
+      });
+    }
+    deleted.push(tag?.name ?? name);
+  }
+  if (deleted.length === 0) {
+    throw new UserError(
+      `No tag named ${notFound.map((n) => `"${n}"`).join(", ")}.`,
+    );
+  }
+  // One update for all of them, so the forum's tag list changes once.
+  if (keep.size !== tags.length) {
     await forum.setAvailableTags(
-      tags.filter((t) => t !== tag),
+      [...keep],
       `Deleted by ${interaction.user.tag} with /tags delete`,
     );
   }
-  if (kind) {
-    await convex.mutation(api.tagRules.remove, {
-      guildId: guild.id,
-      kind,
-      name,
-      apiToken,
-    });
-  }
-  return `Deleted the tag "${tag?.name ?? name}" from <#${forum.id}>. Jev won't use it anymore.`;
+  const list = deleted.map((n) => `"${n}"`).join(", ");
+  return (
+    `Deleted ${deleted.length === 1 ? "the tag" : "the tags"} ${list} from <#${forum.id}>. Jev won't use ${deleted.length === 1 ? "it" : "them"} anymore.` +
+    (notFound.length
+      ? ` Not found: ${notFound.map((n) => `"${n}"`).join(", ")}.`
+      : "")
+  );
 }
 
 /**
@@ -379,7 +420,7 @@ export async function handleTagsCommand(
     } else if (sub === "edit") {
       change = await editTag(interaction, guild, convex, apiToken);
     } else {
-      change = await deleteTag(interaction, guild, convex, apiToken);
+      change = await deleteTags(interaction, guild, convex, apiToken);
     }
     await interaction.editReply(change);
     await announceToMods(guild, interaction, change, convex, apiToken);
