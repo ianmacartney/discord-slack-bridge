@@ -1,4 +1,4 @@
-FROM node:18 AS builder
+FROM node:20 AS builder
 
 RUN npm install -g pnpm@12.8.1
 WORKDIR /usr/src/app
@@ -6,7 +6,7 @@ COPY package.json ./
 RUN pnpm install --prod
 
 
-FROM node:18-alpine
+FROM node:20-alpine
 
 USER node
 WORKDIR /usr/src/app

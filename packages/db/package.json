@@ -12,22 +12,24 @@
     "dockerBotBuild": "npm run build && docker build . -t discordbot:latest",
     "dockerBot": "docker run --init --env-file .env --rm discordbot:latest",
     "flyDeploy": "npm run build && fly deploy",
-    "setup": "convex dev --until-success"
+    "setup": "convex dev --until-success",
+    "lint": "eslint convex"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@slack/web-api": "^6.8.1",
     "algoliasearch": "^4.17.0",
-    "convex": "^1.16.0",
-    "convex-helpers": "0.1.58",
+    "convex": "^1.46.0",
+    "convex-helpers": "^0.1.124",
     "discord.js": "^14.9.0",
-    "lodash": "^4.17.21",
-    "node-fetch": "^3.3.0",
-    "openai": "^4.24.7"
+    "lodash": "^4.17.21"
   },
   "devDependencies": {
+    "@convex-dev/eslint-plugin": "^5.0.0",
     "@types/lodash": "^4.14.202",
-    "typescript": "^5.0.3"
+    "eslint": "^10.11.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0"
   }
 }

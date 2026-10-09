@@ -42,7 +42,7 @@ export const assignRandomEmployee = internalMutation({
       .collect();
     const assigneeEmployee =
       possibleAssignees[Math.floor(Math.random() * possibleAssignees.length)];
-    await ctx.db.patch(ticketId, { assignee: assigneeEmployee._id });
+    await ctx.db.patch("tickets", ticketId, { assignee: assigneeEmployee._id });
   },
 });
 
@@ -78,9 +78,11 @@ export const getTickets = query({
 
     const ret = await filtered.paginate(args.paginationOpts);
     const page = await asyncMap(ret.page, async (ticket) => {
-      const assignee = ticket.assignee && (await ctx.db.get(ticket.assignee));
-      const assigneeUser = assignee && (await ctx.db.get(assignee.userId));
-      const discordThread = await ctx.db.get(ticket.source.id);
+      const assignee =
+        ticket.assignee && (await ctx.db.get("employees", ticket.assignee));
+      const assigneeUser =
+        assignee && (await ctx.db.get("users", assignee.userId));
+      const discordThread = await ctx.db.get("threads", ticket.source.id);
       return {
         ...ticket,
         name: assigneeUser?.displayName,
@@ -113,7 +115,7 @@ export const assignTicket = mutation({
 export const resolveTicket = mutation({
   args: { ticketId: v.id("tickets") },
   handler: async (ctx, args) => {
-    const ticket = await ctx.db.get(args.ticketId);
+    const ticket = await ctx.db.get("tickets", args.ticketId);
     if (!ticket) {
       throw new Error("Ticket not found");
     }

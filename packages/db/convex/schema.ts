@@ -150,7 +150,8 @@ export default defineSchema({
     .index("id", ["id"])
     .searchIndex("username", { searchField: "username" })
     .searchIndex("nickname", { searchField: "nickname" })
-    .searchIndex("displayName", { searchField: "displayName" }),
+    .searchIndex("displayName", { searchField: "displayName" })
+    .index("by_slackUserId", ["slackUserId"]),
   registrations: Registrations.table.index("discordUserId", ["discordUserId"]),
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),
