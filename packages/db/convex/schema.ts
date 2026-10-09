@@ -136,7 +136,149 @@ export const Employees = Table("employees", {
   email: v.string(),
 });
 
+export const moderationActionKind = v.union(
+  v.literal("delete"),
+  v.literal("timeout"),
+  v.literal("kick"),
+  v.literal("ban"),
+  v.literal("warn"), // a DM telling the person a moderator warned them
+  v.literal("untimeout"), // lifts a timeout, for a card dismissed as a mistake
+);
+export const moderationActionStatus = v.union(
+  v.literal("proposed"), // waiting for execution (auto) or for a human decision
+  v.literal("approved"), // a human approved it; execution is scheduled
+  v.literal("rejected"),
+  v.literal("executed"),
+  v.literal("dry_run"), // would have run, but dry-run mode is on
+  v.literal("skipped"), // a safety check blocked it; see `note`
+  v.literal("failed"),
+);
+export const ModerationActions = Table("moderationActions", {
+  action: moderationActionKind,
+  status: moderationActionStatus,
+  // true: runs without a human; false: needs an Approve click in the mod channel.
+  auto: v.boolean(),
+  dryRun: v.boolean(),
+  reason: v.string(),
+  category: v.optional(v.string()),
+  confidence: v.optional(v.number()),
+  targetDiscordUserId: v.string(),
+  // Discord channel (or thread) id the message lives in; used to find the guild.
+  channelId: v.string(),
+  discordMessageId: v.optional(v.string()),
+  durationMinutes: v.optional(v.number()),
+  proposalMessageId: v.optional(v.string()),
+  decidedBy: v.optional(v.string()),
+  note: v.optional(v.string()),
+  // The mod-channel card this action belongs to, if any. The card reports on it, so it is not logged separately.
+  alertId: v.optional(v.id("modAlerts")),
+  // Ban only: days of the person's recent messages Discord deletes with the ban (0 to 7).
+  deleteMessageDays: v.optional(v.number()),
+});
+
+// Per-server settings: the support forum to auto-tag (/tags), the mod channel and the forwarding channels.
+export const GuildSettings = Table("guildSettings", {
+  guildId: v.string(),
+  // The support forum whose new posts get auto-tagged, set with the bot's /tags command. Unset: no auto-tagging.
+  tagForumId: v.optional(nullable(v.string())),
+  // Private channel for mod-only posts (auto-tag notes with Undo, moderation proposals), set with /modchannel.
+  modChannelId: v.optional(nullable(v.string())),
+  // The chat channel (usually #general) whose long help requests are forwarded to the support forum, set with /forwardfrom.
+  forwardFromChannelId: v.optional(nullable(v.string())),
+  // The support forum those requests are opened in, set with /forwardfrom. Unset: the /tags forum.
+  forwardToForumId: v.optional(nullable(v.string())),
+});
+
+// A rule violation that triggered a mod-channel card ("Spam detected", ...) with action buttons.
+export const ModAlerts = Table("modAlerts", {
+  kind: v.string(), // a key of VIOLATION_TITLES in violations.ts
+  targetDiscordUserId: v.string(),
+  channelId: v.string(),
+  discordMessageId: v.string(),
+  // The deleted message's text (truncated), so moderators can judge it from the card.
+  content: v.string(),
+  confidence: v.optional(v.number()),
+  reason: v.string(),
+  // The automatic 1-day timeout, so Dismiss can lift it.
+  timeoutActionId: v.optional(v.id("moderationActions")),
+  status: v.union(v.literal("open"), v.literal("handled")),
+  handledBy: v.optional(v.string()),
+  handledAction: v.optional(v.string()),
+  noteMessageId: v.optional(v.string()),
+});
+
+// One row per auto-tag decision (on post creation, or a mod's /tags retag), whether or not it applied anything.
+// Powers the mod-channel note, Undo, and /tags audit.
+export const TagDecisions = Table("tagDecisions", {
+  guildId: v.optional(v.string()),
+  threadId: v.id("threads"),
+  discordThreadId: v.string(),
+  trigger: v.union(v.literal("creation"), v.literal("retag")),
+  // Discord user id of the mod who ran /tags retag.
+  triggeredBy: v.optional(v.string()),
+  decisions: v.array(
+    v.object({
+      question: v.string(),
+      choice: v.string(),
+      confidence: v.number(),
+      tag: nullable(v.string()),
+      note: nullable(v.string()),
+    }),
+  ),
+  // The tags the bot set on the post (so Undo and /tags retag only touch the bot's own tags).
+  appliedTagIds: v.array(v.string()),
+  status: v.union(
+    v.literal("applied"),
+    v.literal("nothing"), // Jev decided, but no tag passed the checks
+    v.literal("undone"), // a mod pressed Undo
+    v.literal("superseded"), // replaced by a later /tags retag
+  ),
+  noteMessageId: v.optional(v.string()),
+  undoneBy: v.optional(v.string()),
+  // A moderator picked the tags by hand with the card's Edit button; appliedTagIds is then their final choice.
+  editedBy: v.optional(v.string()),
+});
+
+// Changes a server made to the auto-tagger's definitions (see tagDefinitions.ts) with /tags rule. A row with the key
+// of a built-in definition overrides it, or hides it when `removed` is true. Any other key is a definition the
+// server added.
+export const TagRules = Table("tagRules", {
+  guildId: v.string(),
+  kind: v.union(v.literal("type"), v.literal("area")),
+  key: v.string(),
+  tag: v.string(),
+  when: v.string(),
+  removed: v.optional(v.boolean()),
+});
+
+// A help request the bot forwarded from chat into its own support-forum post. Links the two so the original message
+// gets a thumbs up once the post is resolved.
+export const HelpForwards = Table("helpForwards", {
+  discordMessageId: v.string(),
+  sourceChannelId: v.string(),
+  discordThreadId: v.string(),
+  authorDiscordId: v.string(),
+  resolved: v.optional(v.boolean()),
+});
+
 export default defineSchema({
+  helpForwards: HelpForwards.table
+    .index("by_discordMessageId", ["discordMessageId"])
+    .index("by_discordThreadId", ["discordThreadId"]),
+  tagRules: TagRules.table.index("by_guildId", ["guildId"]),
+  modAlerts: ModAlerts.table.index("by_targetDiscordUserId", [
+    "targetDiscordUserId",
+  ]),
+  tagDecisions: TagDecisions.table
+    .index("by_threadId", ["threadId"])
+    .index("by_guildId", ["guildId"]),
+  guildSettings: GuildSettings.table.index("by_guildId", ["guildId"]),
+  moderationActions: ModerationActions.table
+    .index("by_status", ["status"])
+    .index("by_targetDiscordUserId_and_action", [
+      "targetDiscordUserId",
+      "action",
+    ]),
   channels: Channels.table.index("id", ["id"]),
   messages: Messages.table
     .index("id", ["id"])
@@ -148,10 +290,10 @@ export default defineSchema({
     .index("version", ["version"]),
   users: Users.table
     .index("id", ["id"])
+    .index("by_slackUserId", ["slackUserId"])
     .searchIndex("username", { searchField: "username" })
     .searchIndex("nickname", { searchField: "nickname" })
-    .searchIndex("displayName", { searchField: "displayName" })
-    .index("by_slackUserId", ["slackUserId"]),
+    .searchIndex("displayName", { searchField: "displayName" }),
   registrations: Registrations.table.index("discordUserId", ["discordUserId"]),
   threadSearchStatus: defineTable({
     indexedCursor: v.number(),

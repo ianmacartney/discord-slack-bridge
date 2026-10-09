@@ -35,6 +35,10 @@ type Env = {
   readonly CONVEX_API_TOKEN: string;
   readonly DISCORD_RESOLVED_TAG_ID: string;
   readonly DISCORD_TOKEN: string;
+  readonly MODERATION_ALLOW_BOT_TARGETS: string | undefined;
+  readonly MODERATION_DRY_RUN: string | undefined;
+  readonly MODERATION_EXEMPT_USER_IDS: string | undefined;
+  readonly MOD_CHANNEL_ID: string | undefined;
   readonly SLACK_TOKEN: string;
   readonly VERIFICATION_DISCORD_TOKEN: string | undefined;
   readonly VERIFICATION_GUILD_ID: string | undefined;

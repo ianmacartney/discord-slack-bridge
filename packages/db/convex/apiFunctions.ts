@@ -1,9 +1,22 @@
 import {
   customAction,
   customMutation,
+  customQuery,
 } from "convex-helpers/server/customFunctions";
-import { action, mutation, env } from "./_generated/server";
+import { action, mutation, query, env } from "./_generated/server";
 import { v } from "convex/values";
+
+export const apiQuery = customQuery(query, {
+  args: {
+    apiToken: v.string(),
+  },
+  input: async (_ctx, args) => {
+    if (args.apiToken !== env.CONVEX_API_TOKEN) {
+      throw new Error("Invalid API Token");
+    }
+    return { ctx: {}, args: {} };
+  },
+});
 
 export const apiMutation = customMutation(mutation, {
   args: {
