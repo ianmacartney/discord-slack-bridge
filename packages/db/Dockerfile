@@ -3,6 +3,10 @@ FROM node:20 AS builder
 RUN npm install -g pnpm@12.8.1
 WORKDIR /usr/src/app
 COPY package.json ./
+# The build context is only this package, so the repo-root pnpm-workspace.yaml
+# (and its allowBuilds list) isn't visible here. pnpm 12 fails on unapproved
+# build scripts, so approve esbuild (pulled in by convex) explicitly.
+RUN printf 'allowBuilds:\n  esbuild: true\n' > pnpm-workspace.yaml
 RUN pnpm install --prod
 
 
