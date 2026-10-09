@@ -5,7 +5,7 @@ import { v } from "convex/values";
 
 const discordClient = async () => {
   const bot = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+    intents: [GatewayIntentBits.Guilds],
   });
   const token = env.VERIFICATION_DISCORD_TOKEN;
   if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
