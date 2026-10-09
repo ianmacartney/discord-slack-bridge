@@ -16,6 +16,11 @@ import { CARD_COLOR } from "./convex/brandColors.js";
 import type { Id } from "./convex/_generated/dataModel.js";
 import { handleAskAiCommand, registerAskAiCommand } from "./askAiCommand.js";
 import {
+  handleForwardFromCommand,
+  handleForwardText,
+  registerForwardFromCommand,
+} from "./forwardFromCommand.js";
+import {
   handleConfidenceCommand,
   registerConfidenceCommand,
 } from "./confidenceCommand.js";
@@ -93,6 +98,11 @@ bot.on("ready", async () => {
       console.error(`Could not register /confidence in ${guild.name}:`, e);
     }
     try {
+      await registerForwardFromCommand(guild);
+    } catch (e) {
+      console.error(`Could not register /forwardfrom in ${guild.name}:`, e);
+    }
+    try {
       await registerAskAiCommand(guild);
     } catch (e) {
       console.error(`Could not register /askai in ${guild.name}:`, e);
@@ -101,6 +111,9 @@ bot.on("ready", async () => {
 });
 
 bot.on("messageCreate", async (msg) => {
+  // Moderators reply to a message with "!forward" to open a support post from it (see forwardFromCommand.ts).
+  // The commands themselves aren't stored.
+  if (await handleForwardText(msg, convex, apiToken)) return;
   let channel, thread;
   if (
     (msg.channel.type === ChannelType.PublicThread ||
@@ -260,6 +273,14 @@ bot.on("interactionCreate", async (interaction) => {
     interaction.commandName === "confidence"
   ) {
     await handleConfidenceCommand(interaction, convex, apiToken);
+    return;
+  }
+
+  if (
+    interaction.isChatInputCommand() &&
+    interaction.commandName === "forwardfrom"
+  ) {
+    await handleForwardFromCommand(interaction, convex, apiToken);
     return;
   }
 

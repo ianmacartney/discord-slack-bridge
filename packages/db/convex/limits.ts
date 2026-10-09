@@ -2,7 +2,7 @@ import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "./_generated/api";
 
 const limiter = new RateLimiter(components.rateLimiter, {
-  // One "please elaborate in a thread" reply per person every 30 minutes. A bucket of 1 means the next reply is only
+  // One forwarded support post per person every 30 minutes, so the bot doesn't overdo it.
   helpFollowUp: {
     kind: "token bucket",
     rate: 1,

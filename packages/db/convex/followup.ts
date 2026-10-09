@@ -1,45 +1,120 @@
-// Follow-up for messages classified as needs_help: ask the person to elaborate in a thread in the support channel.
-// The Discord reply itself is sent from followup_node.ts.
+// Forwarding long help requests from chat into the support forum. Only messages in the channel picked with
+// /forwardfrom count. The Discord side (forwarding, reactions) lives in followup_node.ts.
 import { v } from "convex/values";
-import { env, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { env, internalMutation, internalQuery } from "./_generated/server";
+import { apiMutation } from "./apiFunctions";
 
-export const followUpContext = v.object({
+export const forwardContext = v.object({
   discordMessageId: v.string(),
-  // The channel the message was posted in (never a thread), where the reply goes.
-  replyChannelId: v.string(),
+  sourceChannelId: v.string(),
+  guildId: v.string(),
+  forumId: v.string(),
   authorDiscordId: v.string(),
-  supportChannelId: v.union(v.string(), v.null()),
+  text: v.string(),
 });
 
-export const getFollowUpContext = internalQuery({
+/** Null unless this is a person's message in the server's /forwardfrom channel that hasn't been forwarded yet. */
+export const getForwardContext = internalQuery({
   args: { messageId: v.id("messages") },
-  returns: v.union(v.null(), followUpContext),
+  returns: v.union(v.null(), forwardContext),
   handler: async ({ db }, { messageId }) => {
     const message = await db.get("messages", messageId);
-    // Already in a thread (including the support forum's posts): they're where we'd send them.
     if (!message || message.threadId) return null;
-    const author = await db.get("users", message.authorId);
-    const channel = await db.get("channels", message.channelId);
+    const [author, channel] = await Promise.all([
+      db.get("users", message.authorId),
+      db.get("channels", message.channelId),
+    ]);
     if (!author || !channel || author.bot) return null;
 
-    const supportChannelId = env.AUTO_REPLY_CHANNEL_ID ?? null;
-
-    // Not in the channels the bot itself points people to or posts cards in: the ask-ai channel and the mod channel.
-    const settings = await db.query("guildSettings").take(50);
-    const excluded = new Set(
-      [
-        env.ASK_AI_CHANNEL_ID,
-        env.MOD_CHANNEL_ID,
-        ...settings.flatMap((s) => [s.askAiChannelId, s.modChannelId]),
-      ].filter((id) => !!id),
+    // Messages don't record their server, so find the server whose /forwardfrom channel this is.
+    const settings = (await db.query("guildSettings").take(50)).find(
+      (s) => s.forwardFromChannelId === channel.id,
     );
-    if (excluded.has(channel.id)) return null;
+    const forumId =
+      settings?.forwardToForumId ??
+      settings?.tagForumId ??
+      env.AUTO_REPLY_CHANNEL_ID;
+    if (!settings || !forumId) return null;
+
+    const already = await db
+      .query("helpForwards")
+      .withIndex("by_discordMessageId", (q) =>
+        q.eq("discordMessageId", message.id),
+      )
+      .first();
+    if (already) return null;
 
     return {
       discordMessageId: message.id,
-      replyChannelId: channel.id,
+      sourceChannelId: channel.id,
+      guildId: settings.guildId,
+      forumId,
       authorDiscordId: author.id,
-      supportChannelId,
+      text: message.cleanContent,
     };
+  },
+});
+
+export const recordForward = internalMutation({
+  args: {
+    discordMessageId: v.string(),
+    sourceChannelId: v.string(),
+    discordThreadId: v.string(),
+    authorDiscordId: v.string(),
+  },
+  returns: v.null(),
+  handler: async ({ db }, args) => {
+    await db.insert("helpForwards", args);
+    return null;
+  },
+});
+
+/**
+ * Bot: a moderator used "Forward to support" on a message. Works in any channel, with no AI check and no rate limit.
+ * Opens the post in the /forwardfrom forum (or the /tags forum).
+ */
+export const requestForward = apiMutation({
+  args: {
+    guildId: v.string(),
+    sourceChannelId: v.string(),
+    discordMessageId: v.string(),
+    authorDiscordId: v.string(),
+    text: v.string(),
+    forwardedBy: v.string(),
+  },
+  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { forwardedBy, ...message }) => {
+    const already = await ctx.db
+      .query("helpForwards")
+      .withIndex("by_discordMessageId", (q) =>
+        q.eq("discordMessageId", message.discordMessageId),
+      )
+      .first();
+    if (already) {
+      return {
+        ok: false,
+        reason: `Already forwarded to <#${already.discordThreadId}>.`,
+      };
+    }
+    const settings = await ctx.db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", message.guildId))
+      .unique();
+    const forumId =
+      settings?.forwardToForumId ??
+      settings?.tagForumId ??
+      env.AUTO_REPLY_CHANNEL_ID;
+    if (!forumId) {
+      return {
+        ok: false,
+        reason: "No support forum is set. Use /forwardfrom set.",
+      };
+    }
+    await ctx.scheduler.runAfter(0, internal.followup_node.forwardManually, {
+      context: { ...message, forumId },
+      forwardedBy,
+    });
+    return { ok: true };
   },
 });

@@ -107,12 +107,12 @@ export const classifyMessage = internalAction({
       confidence: answer.confidence,
     });
     const thresholds = await ctx.runQuery(internal.thresholds.all);
-    // Nudge people who need help toward a thread in the support channel (guards live in followup.ts).
+    // Long help requests in the /forwardfrom channel get their own support-forum post (guards live in followup.ts).
     if (
       answer.choice === "needs_help" &&
       (answer.confidence ?? 0) >= thresholds.needs_help
     ) {
-      await ctx.scheduler.runAfter(0, internal.followup_node.sendHelpFollowUp, {
+      await ctx.scheduler.runAfter(0, internal.followup_node.forwardToSupport, {
         messageId,
       });
     }

@@ -27,8 +27,8 @@ export const set = apiMutation({
   args: { guildId: v.string(), ...settings.fields },
   returns: v.null(),
   handler: async ({ db }, { guildId, vipChannelId, linkAllowedRoleIds }) => {
-
-    const row = await db.query("guildSettings")
+    const row = await db
+      .query("guildSettings")
       .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
       .unique();
 
@@ -123,9 +123,9 @@ export const modChannelFor = internalQuery({
   handler: async ({ db }, { guildId }) => {
     const row = guildId
       ? await db
-        .query("guildSettings")
-        .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-        .unique()
+          .query("guildSettings")
+          .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+          .unique()
       : null;
     return row?.modChannelId ?? env.MOD_CHANNEL_ID ?? null;
   },
@@ -172,10 +172,61 @@ export const askAiChannelFor = internalQuery({
   handler: async ({ db }, { guildId }) => {
     const row = guildId
       ? await db
-        .query("guildSettings")
-        .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
-        .unique()
+          .query("guildSettings")
+          .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+          .unique()
       : null;
     return row?.askAiChannelId ?? env.ASK_AI_CHANNEL_ID ?? null;
+  },
+});
+
+export const getForwardFrom = apiQuery({
+  args: { guildId: v.string() },
+  returns: v.object({
+    fromChannelId: v.union(v.string(), v.null()),
+    toForumId: v.union(v.string(), v.null()),
+  }),
+  handler: async ({ db }, { guildId }) => {
+    const row = await db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+      .unique();
+    return {
+      fromChannelId: row?.forwardFromChannelId ?? null,
+      toForumId: row?.forwardToForumId ?? row?.tagForumId ?? null,
+    };
+  },
+});
+
+export const setForwardFrom = apiMutation({
+  args: {
+    guildId: v.string(),
+    forwardFromChannelId: v.union(v.string(), v.null()),
+    forwardToForumId: v.union(v.string(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (
+    { db },
+    { guildId, forwardFromChannelId, forwardToForumId },
+  ) => {
+    const row = await db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+      .unique();
+    if (row) {
+      await db.patch("guildSettings", row._id, {
+        forwardFromChannelId,
+        forwardToForumId,
+      });
+    } else {
+      await db.insert("guildSettings", {
+        guildId,
+        forwardFromChannelId,
+        forwardToForumId,
+        vipChannelId: null,
+        linkAllowedRoleIds: [],
+      });
+    }
+    return null;
   },
 });

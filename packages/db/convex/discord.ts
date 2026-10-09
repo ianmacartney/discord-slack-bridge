@@ -350,7 +350,26 @@ export const updateThread = apiMutation({
       .unique();
     if (!existing) return;
     await touchThread({ db }, { threadId: existing._id });
+    const nowResolved =
+      !existing.appliedTags.includes(resolvedTagId) &&
+      thread.appliedTags.includes(resolvedTagId);
     await db.patch("threads", existing._id, thread);
+    // A post the bot opened from a chat message was resolved: thumbs up on that original message.
+    if (nowResolved) {
+      const forward = await db
+        .query("helpForwards")
+        .withIndex("by_discordThreadId", (q) =>
+          q.eq("discordThreadId", thread.id),
+        )
+        .first();
+      if (forward && !forward.resolved) {
+        await db.patch("helpForwards", forward._id, { resolved: true });
+        await scheduler.runAfter(0, internal.followup_node.reactResolved, {
+          sourceChannelId: forward.sourceChannelId,
+          discordMessageId: forward.discordMessageId,
+        });
+      }
+    }
     const channel = await db.get("channels", existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {

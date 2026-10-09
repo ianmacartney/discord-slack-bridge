@@ -188,6 +188,10 @@ export const GuildSettings = Table("guildSettings", {
   modChannelId: v.optional(nullable(v.string())),
   // Where people can get a quick AI answer first (the ask-ai channel), set with /askai. Mentioned in the follow-up.
   askAiChannelId: v.optional(nullable(v.string())),
+  // The chat channel (usually #general) whose long help requests are forwarded to the support forum, set with /forwardfrom.
+  forwardFromChannelId: v.optional(nullable(v.string())),
+  // The support forum those requests are opened in, set with /forwardfrom. Unset: the /tags forum.
+  forwardToForumId: v.optional(nullable(v.string())),
 });
 
 // A rule violation that triggered a mod-channel card ("Spam detected", ...) with action buttons.
@@ -259,7 +263,20 @@ export const TagRules = Table("tagRules", {
   removed: v.optional(v.boolean()),
 });
 
+// A help request the bot forwarded from chat into its own support-forum post. Links the two so the original message
+// gets a thumbs up once the post is resolved.
+export const HelpForwards = Table("helpForwards", {
+  discordMessageId: v.string(),
+  sourceChannelId: v.string(),
+  discordThreadId: v.string(),
+  authorDiscordId: v.string(),
+  resolved: v.optional(v.boolean()),
+});
+
 export default defineSchema({
+  helpForwards: HelpForwards.table
+    .index("by_discordMessageId", ["discordMessageId"])
+    .index("by_discordThreadId", ["discordThreadId"]),
   tagRules: TagRules.table.index("by_guildId", ["guildId"]),
   thresholds: Thresholds.table.index("by_name", ["name"]),
   modAlerts: ModAlerts.table.index("by_targetDiscordUserId", [
