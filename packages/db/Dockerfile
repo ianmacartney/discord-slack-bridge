@@ -3,7 +3,8 @@ FROM node:20 AS builder
 RUN npm install -g pnpm@12.8.1
 WORKDIR /usr/src/app
 COPY package.json ./
-RUN pnpm install --prod
+# esbuild (via convex) is only needed by the convex CLI, not the bot at runtime
+RUN pnpm install --prod --ignore-scripts
 
 
 FROM node:20-alpine
