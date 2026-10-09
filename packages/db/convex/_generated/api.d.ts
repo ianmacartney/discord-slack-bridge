@@ -12,6 +12,7 @@ import type * as algolia from "../algolia.js";
 import type * as apiFunctions from "../apiFunctions.js";
 import type * as brandColors from "../brandColors.js";
 import type * as classify from "../classify.js";
+import type * as crons from "../crons.js";
 import type * as decisions from "../decisions.js";
 import type * as discord from "../discord.js";
 import type * as discord_node from "../discord_node.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   apiFunctions: typeof apiFunctions;
   brandColors: typeof brandColors;
   classify: typeof classify;
+  crons: typeof crons;
   decisions: typeof decisions;
   discord: typeof discord;
   discord_node: typeof discord_node;

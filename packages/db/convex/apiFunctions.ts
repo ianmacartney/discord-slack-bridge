@@ -23,7 +23,6 @@ export const apiMutation = customMutation(mutation, {
     apiToken: v.string(),
   },
   input: async (_ctx, args) => {
-    // What is this for?
     if (args.apiToken !== env.CONVEX_API_TOKEN) {
       throw new Error("Invalid API Token");
     }
