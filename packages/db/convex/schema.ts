@@ -49,6 +49,7 @@ export const DiscordMessage = {
       channelId: v.string(),
       guildId: v.optional(v.string()),
       messageId: v.optional(v.string()),
+      type: v.optional(v.number()),
     }),
   ),
   system: v.boolean(),
@@ -149,7 +150,7 @@ export const moderationActionStatus = v.union(
   v.literal("approved"), // a human approved it; execution is scheduled
   v.literal("rejected"),
   v.literal("executed"),
-  v.literal("dry_run"), // would have run, but dry-run mode is on
+  v.literal("dry_run"),
   v.literal("skipped"), // a safety check blocked it; see `note`
   v.literal("failed"),
 );
@@ -158,7 +159,7 @@ export const ModerationActions = Table("moderationActions", {
   status: moderationActionStatus,
   // true: runs without a human; false: needs an Approve click in the mod channel.
   auto: v.boolean(),
-  dryRun: v.boolean(),
+  dryRun: v.optional(v.boolean()),
   reason: v.string(),
   category: v.optional(v.string()),
   confidence: v.optional(v.number()),
@@ -239,15 +240,12 @@ export const TagDecisions = Table("tagDecisions", {
   editedBy: v.optional(v.string()),
 });
 
-// Changes a server made to the auto-tagger's definitions (see tagDefinitions.ts) with /tags rule. A row with the key
-// of a built-in definition overrides it, or hides it when `removed` is true. Any other key is a definition the
-// server added.
 export const TagRules = Table("tagRules", {
   guildId: v.string(),
-  kind: v.union(v.literal("type"), v.literal("area")),
   key: v.string(),
   tag: v.string(),
   when: v.string(),
+  kind: v.optional(v.union(v.literal("type"), v.literal("area"))),
   removed: v.optional(v.boolean()),
 });
 

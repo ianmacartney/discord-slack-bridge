@@ -237,6 +237,8 @@ const ALERT_LABEL = {
   dismiss: "Dismissed and timeout lifted",
 } as const;
 
+bot.on("error", (error) => console.error("discord client error", error));
+
 bot.on("interactionCreate", async (interaction) => {
   // Tag suggestions while typing /tags edit or /tags delete.
   if (interaction.isAutocomplete() && interaction.commandName === "tags") {
@@ -272,10 +274,11 @@ bot.on("interactionCreate", async (interaction) => {
 
   // Buttons on a rule-violation card ("Spam detected", ...): customId is `alert:<choice>:<alertId>`.
   if (interaction.isButton() && interaction.customId.startsWith("alert:")) {
+    await interaction.deferUpdate();
     const [, choice, alertId] = interaction.customId.split(":");
     const needed = ALERT_PERMISSION[choice as keyof typeof ALERT_PERMISSION];
     if (!needed || !interaction.memberPermissions?.has(needed)) {
-      await interaction.reply({
+      await interaction.followUp({
         content: `You need permission to ${choice} members to press this.`,
         ephemeral: true,
       });
@@ -290,7 +293,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
       const original = interaction.message.embeds[0];
       const label = ALERT_LABEL[choice as keyof typeof ALERT_LABEL];
-      await interaction.update({
+      await interaction.editReply({
         components: [],
         embeds: original
           ? [
@@ -298,7 +301,7 @@ bot.on("interactionCreate", async (interaction) => {
                 .setColor(CARD_COLOR.muted)
                 .setFooter({
                   text: result.ok
-                    ? `${label} by ${interaction.user.username}${result.dryRun ? " (dry run: nothing was done)" : ""}`
+                    ? `${label} by ${interaction.user.username}`
                     : `Already handled (${result.status ?? "not found"})`,
                 }),
             ]
@@ -307,7 +310,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
     } catch (e) {
       console.error(e);
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went wrong.",
         ephemeral: true,
       });
@@ -318,12 +321,12 @@ bot.on("interactionCreate", async (interaction) => {
   // Edit on an auto-tag card opens a tag picker. The button's customId is `tag:edit:<decisionId>`, and the picker's is
   // `tag:pick:<decisionId>:<cardMessageId>`. Choosing replaces the post's tags and updates the card.
   if (interaction.isButton() && interaction.customId.startsWith("tag:edit:")) {
+    await interaction.deferReply({ ephemeral: true });
     if (
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
     ) {
-      await interaction.reply({
+      await interaction.editReply({
         content: "You need Manage Messages to edit tags.",
-        ephemeral: true,
       });
       return;
     }
@@ -340,9 +343,8 @@ bot.on("interactionCreate", async (interaction) => {
         : null;
       const forum = thread?.isThread() ? thread.parent : null;
       if (!thread?.isThread() || forum?.type !== ChannelType.GuildForum) {
-        await interaction.reply({
+        await interaction.editReply({
           content: "I can't find that post any more.",
-          ephemeral: true,
         });
         return;
       }
@@ -357,19 +359,17 @@ bot.on("interactionCreate", async (interaction) => {
         .setMinValues(0)
         .setMaxValues(Math.min(5, options.length))
         .addOptions(options);
-      await interaction.reply({
+      await interaction.editReply({
         content:
           "Pick the tags this post should have. Your choice replaces its current tags.",
         components: [
           new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
         ],
-        ephemeral: true,
       });
     } catch (e) {
       console.error(e);
-      await interaction.reply({
+      await interaction.editReply({
         content: "Something went wrong.",
-        ephemeral: true,
       });
     }
     return;
@@ -378,10 +378,11 @@ bot.on("interactionCreate", async (interaction) => {
     interaction.isStringSelectMenu() &&
     interaction.customId.startsWith("tag:pick:")
   ) {
+    await interaction.deferUpdate();
     if (
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
     ) {
-      await interaction.reply({
+      await interaction.followUp({
         content: "You need Manage Messages to edit tags.",
         ephemeral: true,
       });
@@ -398,7 +399,7 @@ bot.on("interactionCreate", async (interaction) => {
         : null;
       const forum = thread?.isThread() ? thread.parent : null;
       if (!thread?.isThread() || forum?.type !== ChannelType.GuildForum) {
-        await interaction.update({
+        await interaction.editReply({
           content: "I can't find that post any more.",
           components: [],
         });
@@ -451,13 +452,13 @@ bot.on("interactionCreate", async (interaction) => {
           ],
         });
       }
-      await interaction.update({
+      await interaction.editReply({
         content: `Tags updated: ${names.join(", ") || "none"}.`,
         components: [],
       });
     } catch (e) {
       console.error(e);
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went wrong.",
         ephemeral: true,
       });
@@ -467,10 +468,11 @@ bot.on("interactionCreate", async (interaction) => {
 
   // Undo on an auto-tag note in the mod channel: customId is `tag:undo:<decisionId>`.
   if (interaction.isButton() && interaction.customId.startsWith("tag:undo:")) {
+    await interaction.deferUpdate();
     if (
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
     ) {
-      await interaction.reply({
+      await interaction.followUp({
         content: "You need Manage Messages to undo a tag.",
         ephemeral: true,
       });
@@ -484,7 +486,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
       // Gray the card out and say what happened, keeping the original fields.
       const original = interaction.message.embeds[0];
-      await interaction.update({
+      await interaction.editReply({
         components: [],
         embeds: original
           ? [
@@ -508,7 +510,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
     } catch (e) {
       console.error(e);
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went wrong.",
         ephemeral: true,
       });
@@ -518,11 +520,12 @@ bot.on("interactionCreate", async (interaction) => {
 
   // Moderation proposals: customId is `mod:<approve|reject>:<action>:<actionId>`.
   if (interaction.isButton() && interaction.customId.startsWith("mod:")) {
+    await interaction.deferUpdate();
     const [, decision, action, actionId] = interaction.customId.split(":");
     const needed =
       MOD_APPROVAL_PERMISSION[action as keyof typeof MOD_APPROVAL_PERMISSION];
     if (!needed || !interaction.memberPermissions?.has(needed)) {
-      await interaction.reply({
+      await interaction.followUp({
         content: `You need permission to ${action} members to decide this.`,
         ephemeral: true,
       });
@@ -535,7 +538,7 @@ bot.on("interactionCreate", async (interaction) => {
         decidedBy: interaction.user.id,
         apiToken,
       });
-      await interaction.update({
+      await interaction.editReply({
         components: [],
         content: result.ok
           ? `${decision === "approve" ? "Approved" : "Rejected"} by <@${interaction.user.id}>`
@@ -544,7 +547,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
     } catch (e) {
       console.error(e);
-      await interaction.reply({
+      await interaction.followUp({
         content: "Something went wrong.",
         ephemeral: true,
       });
@@ -553,6 +556,7 @@ bot.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
+    await interaction.deferUpdate();
     let [button, revertButton] = [
       {
         label: "Mark as unresolved",
@@ -596,7 +600,7 @@ bot.on("interactionCreate", async (interaction) => {
       }
 
       // Update button to resolved state.
-      await interaction.update({
+      await interaction.editReply({
         components: [
           {
             type: ComponentType.ActionRow,
@@ -621,7 +625,7 @@ bot.on("interactionCreate", async (interaction) => {
       });
 
       // Revert to original state so the user can try again.
-      await interaction.update({
+      await interaction.editReply({
         components: [
           {
             type: ComponentType.ActionRow,

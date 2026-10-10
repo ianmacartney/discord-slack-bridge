@@ -36,7 +36,6 @@ type Env = {
   readonly DISCORD_RESOLVED_TAG_ID: string;
   readonly DISCORD_TOKEN: string;
   readonly MODERATION_ALLOW_BOT_TARGETS: string | undefined;
-  readonly MODERATION_DRY_RUN: string | undefined;
   readonly MODERATION_EXEMPT_USER_IDS: string | undefined;
   readonly MOD_CHANNEL_ID: string | undefined;
   readonly SLACK_TOKEN: string;

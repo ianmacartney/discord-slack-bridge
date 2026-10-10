@@ -12,9 +12,7 @@ import { Doc } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { CARD_COLOR } from "./brandColors";
 import { discordClient } from "./discord_node";
-
-// Discord allows at most 5 tags on a forum post.
-const MAX_APPLIED_TAGS = 5;
+import { MAX_APPLIED_TAGS } from "./tagDefinitions";
 
 /**
  * Adds and removes forum tags on a post. Tags a human added are never touched, because only the ids passed in are

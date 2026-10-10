@@ -64,18 +64,11 @@ function safetyBlock(
   return null;
 }
 
-/**
- * Posts the rule-violation card ("Spam detected", ...) in the mod channel once the automatic timeout has run, or in
- * dry-run mode would have. It shows the deleted message and has the action buttons; presses are handled by the bot
- * process (the `alert:` buttons in discordBot.ts). If a safety check skipped the timeout (staff, the owner), no card is
- * posted, because nobody needs to act.
- */
 async function postAlertCard(
   ctx: ActionCtx,
   bot: Client,
   guild: Guild,
   action: Doc<"moderationActions">,
-  outcome: "executed" | "dry_run",
 ) {
   if (!action.auto || action.action !== "timeout" || !action.alertId) return;
   try {
@@ -92,12 +85,11 @@ async function postAlertCard(
     const channel = await bot.channels.fetch(modChannelId);
     if (!channel || !("send" in channel)) return;
 
-    const live = outcome === "executed";
     const quote = alert.content.slice(0, 900) || "(no text)";
     // NSFW text is hidden behind a spoiler, so moderators choose whether to read it.
     const shown = alert.kind === "nsfw_or_violent" ? `||${quote}||` : quote;
     const embed = new EmbedBuilder()
-      .setColor(live ? CARD_COLOR.danger : CARD_COLOR.removed)
+      .setColor(CARD_COLOR.danger)
       .setTitle(VIOLATION_TITLES[alert.kind] ?? "Rule violation detected")
       .setDescription(`>>> ${shown}`)
       .addFields(
@@ -118,9 +110,7 @@ async function postAlertCard(
           : []),
         {
           name: "Actions taken",
-          value: live
-            ? "Message deleted, timed out for 1 day"
-            : "Would delete the message and time them out for 1 day (dry run: nothing was done)",
+          value: "Message deleted, timed out for 1 day",
         },
         {
           name: "Actions needed",
@@ -167,11 +157,6 @@ const OUTCOME_CARD = {
     titleSuffix: "",
     footer: () => "Done",
   },
-  dry_run: {
-    color: CARD_COLOR.removed,
-    titleSuffix: " (dry run)",
-    footer: () => "Nothing was done: dry-run mode is on",
-  },
   skipped: {
     color: CARD_COLOR.muted,
     titleSuffix: " skipped",
@@ -180,22 +165,19 @@ const OUTCOME_CARD = {
   },
 } as const;
 
-/**
- * Tells the mod channel about an action the bot took (or, in dry-run mode, would have taken) on its own. Actions a
- * moderator approved already have a proposal card, so only automatic ones are logged. Never fails the action.
- */
 async function logAutoAction(
   ctx: ActionCtx,
   bot: Client,
   guild: Guild,
   action: Doc<"moderationActions">,
-  outcome: "executed" | "dry_run" | "skipped",
+  outcome: "executed" | "skipped",
   note?: string,
 ) {
   const fromChatCommand = action.category === "chat_command";
   if (!action.auto && !fromChatCommand) return;
   // A card (postAlertCard) reports on these, so only a skip needs its own log line.
   if (action.alertId && outcome !== "skipped") return;
+  if (action.action === "delete" && outcome !== "skipped") return;
   try {
     const modChannelId: string | null = await ctx.runQuery(
       internal.guildSettings.modChannelFor,
@@ -264,7 +246,7 @@ export const execute = internalAction({
     if (!runnable) return null;
 
     const finish = async (
-      status: "executed" | "dry_run" | "skipped" | "failed",
+      status: "executed" | "skipped" | "failed",
       note?: string,
     ): Promise<null> => {
       await ctx.runMutation(internal.moderation.setResult, {
@@ -306,12 +288,6 @@ export const execute = internalAction({
         return await finish("skipped", why);
       }
 
-      if (action.dryRun) {
-        await postAlertCard(ctx, bot, guild, action, "dry_run");
-        await logAutoAction(ctx, bot, guild, action, "dry_run");
-        return await finish("dry_run", `dry run: would ${action.action}`);
-      }
-
       const reason = action.reason.slice(0, 400);
       if (action.action === "delete") {
         if (!action.discordMessageId || !("messages" in channel))
@@ -345,7 +321,7 @@ export const execute = internalAction({
           deleteMessageSeconds: (action.deleteMessageDays ?? 0) * 24 * 60 * 60,
         });
       }
-      await postAlertCard(ctx, bot, guild, action, "executed");
+      await postAlertCard(ctx, bot, guild, action);
       await logAutoAction(ctx, bot, guild, action, "executed");
       return await finish("executed");
     } catch (error) {
@@ -390,10 +366,8 @@ export const postProposal = internalAction({
       if (!channel || !("send" in channel))
         throw new Error("The mod channel isn't one the bot can send to");
       const embed = new EmbedBuilder()
-        .setColor(action.dryRun ? CARD_COLOR.removed : CARD_COLOR.danger)
-        .setTitle(
-          `Proposed: ${action.action}${action.dryRun ? " (dry run)" : ""}`,
-        )
+        .setColor(CARD_COLOR.danger)
+        .setTitle(`Proposed: ${action.action}`)
         .addFields(
           {
             name: "Target",
