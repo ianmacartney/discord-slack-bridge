@@ -1,8 +1,3 @@
-// Tags a post in the support forum with two independent Jev decisions: what KIND of post it is, and which AREA it's
-// about. The forum is the one a moderator chose with the bot's /tags command. It runs once, when a post is created.
-// Jev only picks among the tags set up with /tags add (plus the built-in ones in tagDefinitions.ts), and each
-// pick maps to a tag that must already exist in the forum (matched by name, ignoring case, emoji and punctuation).
-// Anything unsure or unmatched is left untagged. Every decision is logged in `tagDecisions`.
 import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -14,19 +9,80 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { apiMutation, apiQuery } from "./apiFunctions";
-import { decide } from "./decisions";
+import { decide, JevQuestion } from "./decisions";
 import { THRESHOLD_DEFAULTS } from "./violations";
 import { TagDecisions } from "./schema";
-import { normalize, type Definition } from "./tagDefinitions";
+import {
+  DEFAULT_WHEN,
+  isTopicTag,
+  MAX_APPLIED_TAGS,
+  normalize,
+} from "./tagDefinitions";
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_MESSAGE_CHARS = 2000;
-// Jev's confidence says how concentrated its answer is. Below the "tag" threshold, a question adds no tag.
 
-const criteria = (definitions: Record<string, Definition>) =>
-  Object.fromEntries(
-    Object.entries(definitions).map(([key, d]) => [key, d.when]),
+export type ForumTag = { id: string; name: string };
+export type TagChoice = {
+  question: string;
+  choice: string;
+  confidence: number;
+  tag: string | null;
+  note: string | null;
+};
+
+export async function chooseTags(
+  ctx: ActionCtx,
+  guildId: string | null,
+  post: { title: string; messages: string[] },
+  forumTags: ForumTag[],
+): Promise<{ tagIds: string[]; decisions: TagChoice[] }> {
+  const rules: Record<string, { tag: string; when: string }> =
+    await ctx.runQuery(internal.tagRules.forGuild, { guildId });
+  const candidates = forumTags.filter(isTopicTag);
+  if (candidates.length === 0) return { tagIds: [], decisions: [] };
+  const questions: Record<string, JevQuestion> = {};
+  for (const t of candidates) {
+    const key = normalize(t.name);
+    const when = rules[key]?.when ?? DEFAULT_WHEN[key] ?? t.name;
+    questions[t.id] = {
+      type: "noul",
+      instructions: `Does the forum tag "${t.name}" apply to this post? It applies when: ${when}`,
+    };
+  }
+  const { answers } = await decide({ post }, questions);
+  const min = THRESHOLD_DEFAULTS.tag;
+  const decisions: TagChoice[] = candidates.map((t) => {
+    const answer = answers[t.id];
+    const p = answer?.type === "noul" ? answer.noul : 0;
+    const applies = p >= min;
+    return {
+      question: t.name,
+      choice: applies ? "yes" : "no",
+      confidence: p,
+      tag: applies ? t.name : null,
+      note: applies ? null : `probability ${p.toFixed(2)} is below ${min}`,
+    };
+  });
+  const tagIds = decisions
+    .filter((d) => d.tag)
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, MAX_APPLIED_TAGS)
+    .map((d) => candidates.find((t) => t.name === d.question)!.id);
+  for (const d of decisions) {
+    if (
+      d.tag &&
+      !tagIds.includes(candidates.find((t) => t.name === d.question)!.id)
+    ) {
+      d.tag = null;
+      d.note = `more than ${MAX_APPLIED_TAGS} tags fit; dropped the least likely`;
+    }
+  }
+  console.log(
+    `tags for "${post.title.slice(0, 60)}": ${JSON.stringify(decisions)}`,
   );
+  return { tagIds, decisions };
+}
 
 const threadForTagging = v.object({
   discordThreadId: v.string(),
@@ -34,6 +90,7 @@ const threadForTagging = v.object({
   forumId: v.union(v.string(), v.null()),
   // The forum this server chose for auto-tagging with /tags, or null if none.
   tagForumId: v.union(v.string(), v.null()),
+  forwarded: v.boolean(),
   // Who created the post, for the card.
   ownerId: v.union(v.string(), v.null()),
   ownerName: v.union(v.string(), v.null()),
@@ -86,6 +143,7 @@ export const getThreadForTagging = internalQuery({
       guildId: thread.guildId ?? null,
       forumId: thread.parentId,
       tagForumId: settings?.tagForumId ?? null,
+      forwarded: owner?.bot ?? false,
       ownerId: thread.ownerId,
       ownerName: owner?.displayName ?? owner?.username ?? null,
       ownerAvatarUrl: owner?.displayAvatarURL ?? owner?.avatarURL ?? null,
@@ -163,16 +221,9 @@ export const setNoteMessage = internalMutation({
 type TagRun = {
   preview: boolean;
   trigger: "creation" | "retag";
-  // Retag: skip the "post has no tags yet" guard. The configured-forum guard still applies.
-  force: boolean;
   triggeredBy?: string;
 };
 
-/**
- * Asks Jev for the post's type and area and, unless `preview`, applies the matching forum tags, logs the decision, and
- * posts a note for moderators. Returns null unless this is a post in the forum the server chose with /tags (preview
- * ignores that) that is untagged (a retag ignores that).
- */
 async function tagThread(
   ctx: ActionCtx,
   threadId: Id<"threads">,
@@ -186,74 +237,18 @@ async function tagThread(
   if (!run.preview) {
     const isSupportPost =
       thread.tagForumId !== null && thread.forumId === thread.tagForumId;
-    const alreadyTagged = !run.force && thread.appliedTagIds.length > 0;
-    if (!isSupportPost || alreadyTagged || thread.messages.length === 0)
+    const forwardedAtCreation = thread.forwarded && run.trigger === "creation";
+    if (!isSupportPost || forwardedAtCreation || thread.messages.length === 0)
       return null;
   }
 
-  const MIN_TAG_CONFIDENCE = THRESHOLD_DEFAULTS.tag;
-  // The built-in definitions plus whatever moderators changed with /tags rule.
-  const { type: POST_TYPES, area: POST_AREAS } = await ctx.runQuery(
-    internal.tagRules.forGuild,
-    { guildId: thread.guildId },
-  );
-  const { answers } = await decide(
-    { post: { title: thread.title, messages: thread.messages } },
-    {
-      type: {
-        type: "choice",
-        instructions: "What kind of forum post is this?",
-        criteria: criteria(POST_TYPES),
-      },
-      area: {
-        type: "choice",
-        instructions: "Which area of Convex is this post mainly about?",
-        criteria: criteria(POST_AREAS),
-      },
-    },
+  const { tagIds, decisions } = await chooseTags(
+    ctx,
+    thread.guildId,
+    { title: thread.title, messages: thread.messages },
+    thread.forumTags,
   );
 
-  const decisions: Infer<typeof tagReport>["decisions"] = [];
-  const tagIds: string[] = [];
-  const postType = answers.type;
-  const notSupportPost =
-    postType.type === "choice" &&
-    postType.choice === "none" &&
-    (postType.confidence ?? 0) >= MIN_TAG_CONFIDENCE;
-  for (const [question, definitions] of [
-    ["type", POST_TYPES],
-    ["area", POST_AREAS],
-  ] as const) {
-    const answer = answers[question];
-    if (answer.type !== "choice") continue;
-    const confidence = answer.confidence ?? 0;
-    const definition = definitions[answer.choice];
-    let tag: string | null = null;
-    let note: string | null = null;
-    if (question === "area" && notSupportPost) {
-      // Jev must pick an area even for chatter, so an area only counts for real support posts.
-      note = "not a support post";
-    } else if (!definition?.tag) {
-      note = "no tag for this choice";
-    } else if (confidence < MIN_TAG_CONFIDENCE) {
-      note = `confidence ${confidence} is below ${MIN_TAG_CONFIDENCE}`;
-    } else {
-      const forumTag = thread.forumTags.find(
-        (t) => normalize(t.name) === normalize(definition.tag!),
-      );
-      if (forumTag) {
-        tag = forumTag.name;
-        tagIds.push(forumTag.id);
-      } else {
-        note = `the forum has no tag named "${definition.tag}"`;
-      }
-    }
-    decisions.push({ question, choice: answer.choice, confidence, tag, note });
-  }
-
-  console.log(
-    `tags for "${thread.title.slice(0, 60)}": ${JSON.stringify(decisions)}`,
-  );
   if (!run.preview) {
     // A retag replaces only the tags the bot set before, never ones a human added.
     const previousIds = thread.previous?.appliedTagIds ?? [];
@@ -298,7 +293,6 @@ export const tagNewPost = internalAction({
     await tagThread(ctx, threadId, {
       preview: false,
       trigger: "creation",
-      force: false,
     });
     return null;
   },
@@ -314,8 +308,7 @@ export const tagThreadNow = internalAction({
   ): Promise<Infer<typeof tagReport> | null> =>
     await tagThread(ctx, threadId, {
       preview: preview ?? false,
-      trigger: "creation",
-      force: false,
+      trigger: "retag",
     }),
 });
 

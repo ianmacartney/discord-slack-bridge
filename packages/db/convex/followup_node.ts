@@ -1,7 +1,7 @@
 "use node";
 
 import { Infer, v } from "convex/values";
-import { ChannelType, EmbedBuilder } from "discord.js";
+import { ChannelFlags, ChannelType, EmbedBuilder } from "discord.js";
 import { internal } from "./_generated/api";
 import { ActionCtx, internalAction } from "./_generated/server";
 import { CARD_COLOR } from "./brandColors";
@@ -9,6 +9,8 @@ import { decide } from "./decisions";
 import { discordClient } from "./discord_node";
 import { forwardContext } from "./followup";
 import { limitPerPerson } from "./limits";
+import { chooseTags } from "./tags";
+import { isTopicTag } from "./tagDefinitions";
 
 // How sure Jev must be that the message deserves its own thread.
 const MIN_WORTH_A_THREAD = 0.7;
@@ -105,8 +107,26 @@ async function openSupportPost(
       context.text.length > room
         ? `${context.text.slice(0, room)}…`
         : context.text;
+    const forumTags = forum.availableTags.map((t) => ({
+      id: t.id,
+      name: t.name,
+    }));
+    let { tagIds } = await chooseTags(
+      ctx,
+      context.guildId,
+      { title, messages: [context.text] },
+      forumTags,
+    ).catch((error) => {
+      console.error("choosing tags for a forwarded post failed", error);
+      return { tagIds: [] as string[] };
+    });
+    if (tagIds.length === 0 && forum.flags.has(ChannelFlags.RequireTag)) {
+      const fallback = forumTags.find(isTopicTag);
+      tagIds = fallback ? [fallback.id] : [];
+    }
     const thread = await forum.threads.create({
       name: title,
+      appliedTags: tagIds,
       message: {
         content: `${header}\n>>> ${quoted}`,
         allowedMentions: { users: [context.authorDiscordId] },
