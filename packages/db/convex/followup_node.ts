@@ -15,7 +15,7 @@ import { isTopicTag } from "./tagDefinitions";
 // How sure Jev must be that the message deserves its own thread.
 const MIN_WORTH_A_THREAD = 0.7;
 // Discord limits a thread name to 100 characters and a message to 2000.
-const MAX_TITLE = 90;
+const MAX_TITLE = 50;
 const MAX_MESSAGE = 2000;
 
 /**
@@ -38,11 +38,10 @@ export const forwardToSupport = internalAction({
       {
         worth_a_thread: {
           type: "choice",
-          instructions:
-            "Should this chat message become its own support thread?",
+          instructions: "Is this a message that should open a support thread?",
           criteria: {
-            yes: "A detailed question or problem written out at length, from someone who is stuck or worried about it.",
-            no: "Short, casual, already answered, or not really a problem that needs follow-up.",
+            yes: "A real question or problem someone needs help with.",
+            no: "Casual chat, already answered, or nothing to follow up on.",
           },
         },
       },
