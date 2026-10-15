@@ -34,6 +34,9 @@ export const VIOLATION_TITLES: Record<string, string> = {
   discord_invite: "Invite to another Discord server",
 };
 
+export const isTeamRole = (name: string) =>
+  ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));
+
 export const inviteCodes = (text: string) =>
   [
     ...text.matchAll(

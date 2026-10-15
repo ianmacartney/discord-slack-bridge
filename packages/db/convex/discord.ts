@@ -13,6 +13,7 @@ import {
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
 import { inviteCodes } from "./violations";
+import { timeoutTeamPing } from "./moderation";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -132,8 +133,9 @@ export const receiveMessage = apiMutation({
     message: v.object(DiscordMessage),
     channel: v.object(DiscordChannel),
     thread: v.optional(v.object(DiscordThread)),
+    pingedTeam: v.optional(v.boolean()),
   },
-  handler: async (ctx, { author, message, channel, thread }) => {
+  handler: async (ctx, { author, message, channel, thread, pingedTeam }) => {
     if (!message.content) {
       return;
     }
@@ -173,6 +175,14 @@ export const receiveMessage = apiMutation({
     ) {
       await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
         messageId,
+      });
+    }
+
+    if (!author.bot && pingedTeam) {
+      await timeoutTeamPing(ctx, {
+        targetDiscordUserId: author.id,
+        channelId: thread?.id ?? channel.id,
+        discordMessageId: message.id,
       });
     }
 

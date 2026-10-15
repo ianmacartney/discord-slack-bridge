@@ -23,6 +23,7 @@ const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
 export const BAN_DELETE_DAYS = 7;
+const TEAM_PING_TIMEOUT_MINUTES = 60;
 const CHAT_TIMEOUT_MINUTES = VIOLATION_TIMEOUT_MINUTES;
 
 export const get = internalQuery({
@@ -342,6 +343,23 @@ export const banForInvite = internalMutation({
     return null;
   },
 });
+
+export async function timeoutTeamPing(
+  ctx: MutationCtx,
+  target: Pick<
+    NewAction,
+    "targetDiscordUserId" | "channelId" | "discordMessageId"
+  >,
+) {
+  await record(ctx, {
+    ...target,
+    auto: true,
+    action: "timeout",
+    category: "team_ping",
+    durationMinutes: TEAM_PING_TIMEOUT_MINUTES,
+    reason: "Pinged the Convex team",
+  });
+}
 
 export const propose = internalMutation({
   args: {

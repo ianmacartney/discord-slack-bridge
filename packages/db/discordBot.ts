@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
 import { CARD_COLOR } from "./convex/brandColors.js";
+import { isTeamRole } from "./convex/violations.js";
 import type { Id } from "./convex/_generated/dataModel.js";
 import { handleModText } from "./modCommands.js";
 import {
@@ -121,6 +122,12 @@ bot.on("messageCreate", async (msg) => {
     message: serializeMessage(msg),
     channel,
     thread,
+    pingedTeam:
+      !msg.member?.roles.cache.some((r) => isTeamRole(r.name)) &&
+      (msg.mentions.roles.some((r) => isTeamRole(r.name)) ||
+        !!msg.mentions.members?.some((m) =>
+          m.roles.cache.some((r) => isTeamRole(r.name)),
+        )),
     apiToken,
   };
   console.log(
