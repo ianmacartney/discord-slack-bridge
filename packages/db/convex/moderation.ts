@@ -1,5 +1,3 @@
-// Moderation policy: turns a message classification into delete/timeout/kick/ban actions.
-// The Discord side (executing, posting proposals) lives in moderation_node.ts.
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
@@ -24,8 +22,8 @@ import { literals } from "convex-helpers/validators";
 const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
-const ALERT_DEDUPE_MS = 10 * 60 * 1000;
 export const BAN_DELETE_DAYS = 7;
+const TEAM_PING_TIMEOUT_MINUTES = 60;
 const CHAT_TIMEOUT_MINUTES = VIOLATION_TIMEOUT_MINUTES;
 
 export const get = internalQuery({
@@ -65,7 +63,6 @@ type NewAction = Omit<
   "_id" | "_creationTime" | "status" | "dryRun"
 >;
 
-/** Records an action and schedules it: automatic ones execute, the rest are posted for approval. */
 async function record(ctx: MutationCtx, action: NewAction) {
   const actionId = await ctx.db.insert("moderationActions", {
     ...action,
@@ -102,6 +99,10 @@ async function countRecent(
   return recent.length;
 }
 
+async function allSettings(ctx: MutationCtx) {
+  return await ctx.db.query("guildSettings").take(50);
+}
+
 async function handleViolation(
   ctx: MutationCtx,
   messageId: Doc<"messages">["_id"],
@@ -119,6 +120,15 @@ async function handleViolation(
   ]);
   if (!author || !channel || author.bot) return;
   const channelId = thread?.id ?? channel.id;
+  if (
+    ban &&
+    (await allSettings(ctx)).some((s) =>
+      s.vipChannelIds?.some((id) => id === channel.id || id === thread?.id),
+    )
+  ) {
+    ban = false;
+    reason += "; not banned automatically in a VIP channel";
+  }
   if (ban) {
     const base = {
       auto: true,
@@ -129,39 +139,25 @@ async function handleViolation(
       discordMessageId: message.id,
     };
     await record(ctx, { ...base, action: "delete", reason });
-    const alreadyBanned =
-      (await countRecent(ctx, author.id, "ban", ALERT_DEDUPE_MS)) > 0;
-    if (!alreadyBanned) {
-      await record(ctx, {
-        ...base,
-        action: "ban",
-        deleteMessageDays: BAN_DELETE_DAYS,
-        reason,
-      });
-    }
+    await record(ctx, {
+      ...base,
+      action: "ban",
+      deleteMessageDays: BAN_DELETE_DAYS,
+      reason,
+    });
     return;
   }
 
-  const recent = await ctx.db
-    .query("modAlerts")
-    .withIndex("by_targetDiscordUserId", (q) =>
-      q
-        .eq("targetDiscordUserId", author.id)
-        .gt("_creationTime", Date.now() - ALERT_DEDUPE_MS),
-    )
-    .first();
-  const alertId =
-    recent?._id ??
-    (await ctx.db.insert("modAlerts", {
-      kind,
-      targetDiscordUserId: author.id,
-      channelId,
-      discordMessageId: message.id,
-      content: message.cleanContent.slice(0, 1000),
-      confidence,
-      reason,
-      status: "open",
-    }));
+  const alertId = await ctx.db.insert("modAlerts", {
+    kind,
+    targetDiscordUserId: author.id,
+    channelId,
+    discordMessageId: message.id,
+    content: message.cleanContent.slice(0, 1000),
+    confidence,
+    reason,
+    status: "open",
+  });
   const base = {
     auto: true,
     category: kind,
@@ -172,7 +168,6 @@ async function handleViolation(
     alertId,
   };
   await record(ctx, { ...base, action: "delete", reason });
-  if (recent) return;
   const timeoutId = await record(ctx, {
     ...base,
     action: "timeout",
@@ -182,40 +177,92 @@ async function handleViolation(
   await ctx.db.patch("modAlerts", alertId, { timeoutActionId: timeoutId });
 }
 
-/**
- * Called after a message is classified.
- *  - harassment above the threshold: auto-delete the message and propose a 1-hour timeout for approval.
- *  - 5 flagged messages in 24 hours: propose a kick for approval.
- */
+async function remind(
+  ctx: MutationCtx,
+  messageId: Doc<"messages">["_id"],
+  kind: "dm_solicitation" | "convex_self_promo",
+  confidence: number,
+) {
+  const message = await ctx.db.get("messages", messageId);
+  if (!message) return;
+  const [author, channel, thread] = await Promise.all([
+    ctx.db.get("users", message.authorId),
+    ctx.db.get("channels", message.channelId),
+    message.threadId ? ctx.db.get("threads", message.threadId) : null,
+  ]);
+  if (!author || !channel || author.bot) return;
+  const base = {
+    auto: true,
+    category: kind,
+    confidence,
+    targetDiscordUserId: author.id,
+    channelId: thread?.id ?? channel.id,
+    discordMessageId: message.id,
+  };
+  const jev = `(Jev, ${Math.round(confidence * 100)}%)`;
+  if (kind === "convex_self_promo") {
+    const promo = (await allSettings(ctx)).find(
+      (s) => s.selfPromoChannelId,
+    )?.selfPromoChannelId;
+    if (!promo || promo === channel.id || promo === thread?.id) return;
+    await record(ctx, {
+      ...base,
+      action: "delete",
+      reason: `Convex self-promotion outside the self-promo channel ${jev}`,
+    });
+    return;
+  }
+  await record(ctx, {
+    ...base,
+    action: "timeout",
+    durationMinutes: VIOLATION_TIMEOUT_MINUTES,
+    reason: `Asked people to DM, or said they sent someone a DM ${jev}`,
+  });
+}
+
 export const applyPolicy = internalMutation({
   args: {
     messageId: v.id("messages"),
     category: v.string(),
     confidence: v.optional(v.number()),
     banScore: v.optional(v.number()),
+    dmScore: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (
     ctx,
-    { messageId, category, confidence = 0, banScore = 0 },
+    { messageId, category, confidence = 0, banScore = 0, dmScore = 0 },
   ) => {
     const min = THRESHOLD_DEFAULTS;
     if (
       (CLASSIFIED_VIOLATIONS as readonly string[]).includes(category) &&
       confidence >= min[category as ThresholdName]
     ) {
-      const ban = banScore >= min.ban;
+      const ban = category === "spam" || banScore >= min.ban;
       await handleViolation(
         ctx,
         messageId,
         category,
         confidence,
         `Classified as ${category} (confidence ${confidence.toFixed(2)})` +
-          (ban
-            ? `; Jev is ${Math.round(banScore * 100)}% sure this account is only here for that`
-            : ""),
+          (category === "spam"
+            ? "; spam is an immediate ban"
+            : ban
+              ? `; Jev is ${Math.round(banScore * 100)}% sure this account is only here for that`
+              : ""),
         ban,
       );
+      return null;
+    }
+    if (dmScore >= min.dm_solicitation) {
+      await remind(ctx, messageId, "dm_solicitation", dmScore);
+      return null;
+    }
+    if (
+      category === "convex_self_promo" &&
+      confidence >= min.convex_self_promo
+    ) {
+      await remind(ctx, messageId, "convex_self_promo", confidence);
       return null;
     }
     if (!(category === "harassment" && confidence >= min.harassment))
@@ -240,7 +287,6 @@ export const applyPolicy = internalMutation({
     };
     const reason = `Classified as ${category} (confidence ${confidence.toFixed(2)})`;
 
-    // Count before recording so this message isn't included.
     const flaggedToday = await countRecent(
       ctx,
       author.id,
@@ -267,7 +313,6 @@ export const applyPolicy = internalMutation({
   },
 });
 
-/** Called when a message uses @everyone or @here (rule 5). No AI: the text is checked exactly. */
 export const alertMassMention = internalMutation({
   args: { messageId: v.id("messages") },
   returns: v.null(),
@@ -283,7 +328,39 @@ export const alertMassMention = internalMutation({
   },
 });
 
-/** Manually propose any action (including ban) for a human to approve in the mod channel. */
+export const banForInvite = internalMutation({
+  args: { messageId: v.id("messages"), code: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { messageId, code }) => {
+    await handleViolation(
+      ctx,
+      messageId,
+      "discord_invite",
+      undefined,
+      `Posted an invite to another Discord server (discord.gg/${code})`,
+      true,
+    );
+    return null;
+  },
+});
+
+export async function timeoutTeamPing(
+  ctx: MutationCtx,
+  target: Pick<
+    NewAction,
+    "targetDiscordUserId" | "channelId" | "discordMessageId"
+  >,
+) {
+  await record(ctx, {
+    ...target,
+    auto: true,
+    action: "timeout",
+    category: "team_ping",
+    durationMinutes: TEAM_PING_TIMEOUT_MINUTES,
+    reason: "Pinged the Convex team",
+  });
+}
+
 export const propose = internalMutation({
   args: {
     action: moderationActionKind,
@@ -297,7 +374,6 @@ export const propose = internalMutation({
   handler: async (ctx, args) => await record(ctx, { ...args, auto: false }),
 });
 
-/** Called by the Discord bot when a moderator clicks Approve / Reject. The bot checks their permissions first. */
 export const decide = apiMutation({
   args: {
     actionId: v.id("moderationActions"),
@@ -341,7 +417,6 @@ export const setAlertNote = internalMutation({
   },
 });
 
-/** Records an action a moderator already chose (no proposal step) and runs it. */
 async function approveAndRun(
   ctx: MutationCtx,
   alert: Doc<"modAlerts">,

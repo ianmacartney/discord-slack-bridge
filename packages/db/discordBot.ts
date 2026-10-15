@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
 import { CARD_COLOR } from "./convex/brandColors.js";
+import { isTeamRole } from "./convex/violations.js";
 import type { Id } from "./convex/_generated/dataModel.js";
 import { handleModText } from "./modCommands.js";
 import {
@@ -20,6 +21,11 @@ import {
   handleForwardText,
   registerForwardFromCommand,
 } from "./forwardFromCommand.js";
+import {
+  CHANNEL_SETTING_COMMANDS,
+  handleChannelSettingCommand,
+  registerChannelSettingCommands,
+} from "./channelSettingsCommand.js";
 import {
   handleModChannelCommand,
   registerModChannelCommand,
@@ -87,12 +93,15 @@ bot.on("ready", async () => {
     } catch (e) {
       console.error(`Could not register /forwardfrom in ${guild.name}:`, e);
     }
+    try {
+      await registerChannelSettingCommands(guild);
+    } catch (e) {
+      console.error(`Could not register channel commands in ${guild.name}:`, e);
+    }
   }
 });
 
 bot.on("messageCreate", async (msg) => {
-  // Moderators reply to a message with "!forward", "!ban ..." or "!timeout ..." (see forwardFromCommand.ts, modCommands.ts).
-  // The commands themselves aren't stored.
   if (await handleForwardText(msg, convex, apiToken)) return;
   if (await handleModText(msg, convex, apiToken)) return;
   let channel, thread;
@@ -113,6 +122,12 @@ bot.on("messageCreate", async (msg) => {
     message: serializeMessage(msg),
     channel,
     thread,
+    pingedTeam:
+      !msg.member?.roles.cache.some((r) => isTeamRole(r.name)) &&
+      (msg.mentions.roles.some((r) => isTeamRole(r.name)) ||
+        !!msg.mentions.members?.some((m) =>
+          m.roles.cache.some((r) => isTeamRole(r.name)),
+        )),
     apiToken,
   };
   console.log(
@@ -120,7 +135,6 @@ bot.on("messageCreate", async (msg) => {
       args.channel.id
     }/${args.thread?.id ?? ""})`,
   );
-  // Upload to Convex
   try {
     await convex.mutation(api.discord.receiveMessage, args);
   } catch (e) {
@@ -211,7 +225,6 @@ bot.on("threadDelete", async (thread) => {
   }
 });
 
-// Permission a moderator needs to approve each kind of action posted in the mod channel.
 const MOD_APPROVAL_PERMISSION = {
   delete: PermissionFlagsBits.ManageMessages,
   timeout: PermissionFlagsBits.ModerateMembers,
@@ -221,7 +234,6 @@ const MOD_APPROVAL_PERMISSION = {
   untimeout: PermissionFlagsBits.ModerateMembers,
 } as const;
 
-// Discord permission needed to press each button on a rule-violation card.
 const ALERT_PERMISSION = {
   ban: PermissionFlagsBits.BanMembers,
   kick: PermissionFlagsBits.KickMembers,
@@ -240,7 +252,6 @@ const ALERT_LABEL = {
 bot.on("error", (error) => console.error("discord client error", error));
 
 bot.on("interactionCreate", async (interaction) => {
-  // Tag suggestions while typing /tags edit or /tags delete.
   if (interaction.isAutocomplete() && interaction.commandName === "tags") {
     await handleTagsAutocomplete(interaction, convex, apiToken);
     return;
@@ -249,7 +260,6 @@ bot.on("interactionCreate", async (interaction) => {
     await interaction.reply("Pong!");
   }
 
-  // Moderators and admins choose which forum gets auto-tagged (Manage Messages by default).
   if (interaction.isChatInputCommand() && interaction.commandName === "tags") {
     await handleTagsCommand(interaction, convex, apiToken);
     return;
@@ -263,7 +273,6 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Admins only: where mod notes and moderation proposals are posted.
   if (
     interaction.isChatInputCommand() &&
     interaction.commandName === "modchannel"
@@ -272,7 +281,14 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Buttons on a rule-violation card ("Spam detected", ...): customId is `alert:<choice>:<alertId>`.
+  if (
+    interaction.isChatInputCommand() &&
+    CHANNEL_SETTING_COMMANDS.includes(interaction.commandName)
+  ) {
+    await handleChannelSettingCommand(interaction, convex, apiToken);
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId.startsWith("alert:")) {
     await interaction.deferUpdate();
     const [, choice, alertId] = interaction.customId.split(":");
@@ -318,8 +334,6 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Edit on an auto-tag card opens a tag picker. The button's customId is `tag:edit:<decisionId>`, and the picker's is
-  // `tag:pick:<decisionId>:<cardMessageId>`. Choosing replaces the post's tags and updates the card.
   if (interaction.isButton() && interaction.customId.startsWith("tag:edit:")) {
     await interaction.deferReply({ ephemeral: true });
     if (
@@ -420,7 +434,6 @@ bot.on("interactionCreate", async (interaction) => {
         const name = forum.availableTags.find((t) => t.id === id)?.name;
         return name ? [name] : [];
       });
-      // Update the card the picker came from.
       const channel = interaction.channel;
       const card =
         channel && "messages" in channel
@@ -466,7 +479,6 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Undo on an auto-tag note in the mod channel: customId is `tag:undo:<decisionId>`.
   if (interaction.isButton() && interaction.customId.startsWith("tag:undo:")) {
     await interaction.deferUpdate();
     if (
@@ -484,7 +496,6 @@ bot.on("interactionCreate", async (interaction) => {
         undoneBy: interaction.user.id,
         apiToken,
       });
-      // Gray the card out and say what happened, keeping the original fields.
       const original = interaction.message.embeds[0];
       await interaction.editReply({
         components: [],
@@ -518,7 +529,6 @@ bot.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // Moderation proposals: customId is `mod:<approve|reject>:<action>:<actionId>`.
   if (interaction.isButton() && interaction.customId.startsWith("mod:")) {
     await interaction.deferUpdate();
     const [, decision, action, actionId] = interaction.customId.split(":");
@@ -588,7 +598,6 @@ bot.on("interactionCreate", async (interaction) => {
         );
       }
 
-      // Add the 'resolved' tag to the thread.
       const currentTags = thread.appliedTags;
       if (currentTags.includes(resolvedTagId)) {
         await thread.setAppliedTags(
@@ -599,7 +608,6 @@ bot.on("interactionCreate", async (interaction) => {
         await thread.setAppliedTags([...currentTags, resolvedTagId]);
       }
 
-      // Update button to resolved state.
       await interaction.editReply({
         components: [
           {
@@ -618,13 +626,11 @@ bot.on("interactionCreate", async (interaction) => {
     } catch (error) {
       console.error("Error resolving thread:", error);
 
-      // Send error message to indicate it failed to resolve.
       await interaction.followUp({
         content: "Failed to resolve thread. Please try again later.",
         ephemeral: true,
       });
 
-      // Revert to original state so the user can try again.
       await interaction.editReply({
         components: [
           {

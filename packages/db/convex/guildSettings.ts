@@ -1,7 +1,7 @@
-// Per-server settings written by the Discord bot (it passes CONVEX_API_TOKEN).
 import { v } from "convex/values";
 import { env, internalQuery } from "./_generated/server";
 import { apiMutation, apiQuery } from "./apiFunctions";
+import { nullable } from "convex-helpers/validators";
 
 export const getTagForum = apiQuery({
   args: { guildId: v.string() },
@@ -67,7 +67,6 @@ export const setModChannel = apiMutation({
   },
 });
 
-/** For server code: the mod channel for a server, from /modchannel, else the MOD_CHANNEL_ID env var, else null. */
 export const modChannelFor = internalQuery({
   args: { guildId: v.union(v.string(), v.null()) },
   returns: v.union(v.string(), v.null()),
@@ -79,6 +78,60 @@ export const modChannelFor = internalQuery({
           .unique()
       : null;
     return row?.modChannelId ?? env.MOD_CHANNEL_ID ?? null;
+  },
+});
+
+const channelSettings = v.object({
+  rulesChannelId: v.optional(nullable(v.string())),
+  selfPromoChannelId: v.optional(nullable(v.string())),
+  vipChannelIds: v.optional(v.array(v.string())),
+});
+
+export const getChannelSettings = apiQuery({
+  args: { guildId: v.string() },
+  returns: channelSettings,
+  handler: async ({ db }, { guildId }) => {
+    const row = await db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+      .unique();
+    return {
+      rulesChannelId: row?.rulesChannelId ?? null,
+      selfPromoChannelId: row?.selfPromoChannelId ?? null,
+      vipChannelIds: row?.vipChannelIds ?? [],
+    };
+  },
+});
+
+export const setChannelSettings = apiMutation({
+  args: { guildId: v.string(), patch: channelSettings },
+  returns: v.null(),
+  handler: async ({ db }, { guildId, patch }) => {
+    const row = await db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+      .unique();
+    if (row) await db.patch("guildSettings", row._id, patch);
+    else await db.insert("guildSettings", { guildId, ...patch });
+    return null;
+  },
+});
+
+export const reminderChannelsFor = internalQuery({
+  args: { guildId: v.string() },
+  returns: v.object({
+    rulesChannelId: v.union(v.string(), v.null()),
+    selfPromoChannelId: v.union(v.string(), v.null()),
+  }),
+  handler: async ({ db }, { guildId }) => {
+    const row = await db
+      .query("guildSettings")
+      .withIndex("by_guildId", (q) => q.eq("guildId", guildId))
+      .unique();
+    return {
+      rulesChannelId: row?.rulesChannelId ?? null,
+      selfPromoChannelId: row?.selfPromoChannelId ?? null,
+    };
   },
 });
 
