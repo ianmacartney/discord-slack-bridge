@@ -58,6 +58,8 @@ if (!autoReplyChannelId) {
   }
 }
 
+const verifiedRoleId = process.env.VERIFICATION_ROLE_ID;
+
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");
 console.log(`Server address: ${deploymentUrl}`);
@@ -191,6 +193,34 @@ bot.on("threadCreate", async (thread) => {
         embeds: [embed],
         components: [actionRow],
       });
+
+      const starter =
+        thread.ownerId === bot.user?.id
+          ? await thread.fetchStarterMessage().catch(() => null)
+          : null;
+      const askerId = starter?.mentions.users.first()?.id ?? thread.ownerId;
+      const asker = askerId
+        ? await thread.guild.members.fetch(askerId).catch(() => null)
+        : null;
+      if (verifiedRoleId && !asker?.roles.cache.has(verifiedRoleId)) {
+        await thread.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor("#d7b3cf")
+              .setDescription(
+                "Please connect your Convex account to your Discord profile to enhance our support. This connection allows us to offer you more efficient assistance and reduce spam.",
+              ),
+          ],
+          components: [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(
+              new ButtonBuilder()
+                .setLabel("Verify")
+                .setURL("https://dashboard.convex.dev/discord")
+                .setStyle(ButtonStyle.Link),
+            ),
+          ],
+        });
+      }
 
       console.log(`Auto-reply sent to new support thread: ${thread.id}`);
     } catch (error) {
@@ -566,6 +596,15 @@ bot.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
+    if (
+      !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
+    ) {
+      await interaction.reply({
+        content: "Only moderators can change whether this is resolved.",
+        ephemeral: true,
+      });
+      return;
+    }
     await interaction.deferUpdate();
     let [button, revertButton] = [
       {
