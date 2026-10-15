@@ -9,7 +9,6 @@ import {
   EmbedBuilder,
   GatewayIntentBits,
   PermissionFlagsBits,
-  SlashCommandBuilder,
   StringSelectMenuBuilder,
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
@@ -101,27 +100,6 @@ bot.on("ready", async () => {
     } catch (e) {
       console.error(`Could not register channel commands in ${guild.name}:`, e);
     }
-    if (verifiedRoleId) {
-      try {
-        await guild.commands.create(
-          new SlashCommandBuilder()
-            .setName("verify")
-            .setDescription(
-              "Confirm you're here with a genuine question, so you can post in the questions forum",
-            )
-            .addStringOption((o) =>
-              o
-                .setName("team")
-                .setDescription("Your Convex team name, if you have one")
-                .setMaxLength(100),
-            )
-            .setDMPermission(false)
-            .toJSON(),
-        );
-      } catch (e) {
-        console.error(`Could not register /verify in ${guild.name}:`, e);
-      }
-    }
   }
 });
 
@@ -192,15 +170,6 @@ bot.on("threadCreate", async (thread) => {
   console.log(`new thread ${thread.id} "${thread.name}" in ${thread.parentId}`);
   if (autoReplyChannelId && thread.parentId === autoReplyChannelId) {
     try {
-      const owner = thread.ownerId
-        ? await thread.guild.members.fetch(thread.ownerId).catch(() => null)
-        : null;
-      if (verifiedRoleId && !owner?.roles.cache.has(verifiedRoleId)) {
-        await thread.send(
-          `<@${thread.ownerId}>, please run \`/verify\` first (with your team name if you have one), then post your question again.`,
-        );
-        return;
-      }
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
         Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
@@ -224,6 +193,29 @@ bot.on("threadCreate", async (thread) => {
         embeds: [embed],
         components: [actionRow],
       });
+
+      const owner = thread.ownerId
+        ? await thread.guild.members.fetch(thread.ownerId).catch(() => null)
+        : null;
+      if (verifiedRoleId && !owner?.roles.cache.has(verifiedRoleId)) {
+        await thread.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor("#d7b3cf")
+              .setDescription(
+                "Please connect your Convex account to your Discord profile to enhance our support. This connection allows us to offer you more efficient assistance and reduce spam.",
+              ),
+          ],
+          components: [
+            new ActionRowBuilder<ButtonBuilder>().addComponents(
+              new ButtonBuilder()
+                .setLabel("Verify")
+                .setURL("https://dashboard.convex.dev/discord")
+                .setStyle(ButtonStyle.Link),
+            ),
+          ],
+        });
+      }
 
       console.log(`Auto-reply sent to new support thread: ${thread.id}`);
     } catch (error) {
@@ -303,35 +295,6 @@ bot.on("interactionCreate", async (interaction) => {
     interaction.commandName === "forwardfrom"
   ) {
     await handleForwardFromCommand(interaction, convex, apiToken);
-    return;
-  }
-
-  if (
-    interaction.isChatInputCommand() &&
-    interaction.commandName === "verify" &&
-    verifiedRoleId
-  ) {
-    try {
-      await convex.mutation(api.verification.verifyMember, {
-        discordUserId: interaction.user.id,
-        teamName: interaction.options.getString("team")?.trim() || undefined,
-        apiToken,
-      });
-      const member = await interaction.guild!.members.fetch(
-        interaction.user.id,
-      );
-      await member.roles.add(verifiedRoleId);
-      await interaction.reply({
-        content: `Thanks, you're verified${autoReplyChannelId ? ` and can post in <#${autoReplyChannelId}>` : ""}.`,
-        ephemeral: true,
-      });
-    } catch (e) {
-      console.error(e);
-      await interaction.reply({
-        content: "Something went wrong.",
-        ephemeral: true,
-      });
-    }
     return;
   }
 
@@ -629,15 +592,10 @@ bot.on("interactionCreate", async (interaction) => {
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
     if (
-      !(
-        interaction.channel?.isThread() &&
-        interaction.channel.ownerId === interaction.user.id
-      ) &&
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
     ) {
       await interaction.reply({
-        content:
-          "Only the person who posted this or a moderator can change whether it's resolved.",
+        content: "Only moderators can change whether this is resolved.",
         ephemeral: true,
       });
       return;

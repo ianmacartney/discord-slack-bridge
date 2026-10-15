@@ -15,7 +15,6 @@ const authorValidator = {
   username: v.string(),
   avatarUrl: v.optional(v.string()),
   associatedAccountId: v.union(v.string(), v.null()),
-  teamName: v.optional(v.string()),
 };
 
 export const sendMessage = internalAction({
@@ -94,7 +93,7 @@ function threadMessage(
 function formatAuthor(author: ObjectType<typeof authorValidator>) {
   return `*${author.name ?? author.username}*${
     author.associatedAccountId ? ` (:aid: ${author.associatedAccountId})` : ""
-  }${author.teamName ? ` (team: ${author.teamName})` : ""}`;
+  }`;
 }
 
 export const updateMessage = internalAction({

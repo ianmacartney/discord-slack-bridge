@@ -205,22 +205,9 @@ export const receiveMessage = apiMutation({
       });
     }
 
-    // A new post in the questions forum only goes to Slack once its author is verified (see /verify).
-    const unverifiedQuestion =
-      dbThread?.ownerId &&
-      !dbThread.slackThreadTs &&
-      env.VERIFICATION_ROLE_ID &&
-      channel.id === env.AUTO_REPLY_CHANNEL_ID &&
-      !(await ctx.db
-        .query("registrations")
-        .withIndex("discordUserId", (q) =>
-          q.eq("discordUserId", dbThread.ownerId!),
-        )
-        .first());
     if (
       (message.type === 0 || message.type === 19) &&
-      dbChannel.slackChannelId &&
-      !unverifiedQuestion
+      dbChannel.slackChannelId
     ) {
       await ctx.scheduler.runAfter(0, internal.slack_node.sendMessage, {
         messageId,
@@ -301,7 +288,6 @@ const slackAuthor = async (db: DatabaseReader, author: DiscordUser) => {
     username: author.username,
     avatarUrl: author.displayAvatarURL ?? author.avatarURL ?? undefined,
     associatedAccountId: registration?.associatedAccountId ?? null,
-    teamName: registration?.teamName,
   };
 };
 
