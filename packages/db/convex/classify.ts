@@ -5,7 +5,7 @@ import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalQuery } from "./_generated/server";
 import { decide } from "./decisions";
-import { THRESHOLD_DEFAULTS } from "./violations";
+import { CLASSIFIED_VIOLATIONS, THRESHOLD_DEFAULTS } from "./violations";
 
 const MAX_MESSAGE_CHARS = 4000;
 
@@ -22,17 +22,31 @@ export const MESSAGE_CATEGORIES = {
     "Advertising availability for work, or hiring, for roles unrelated to Convex.",
   piracy_or_secrets:
     "Sharing or requesting pirated software, stolen or leaked API keys, or copyrighted material.",
+  fraud_or_illegal:
+    "Asking for help with a scam, fraud, theft or other crime, or recruiting others into one.",
   ragebait:
     "Written to provoke anger or arguments rather than to discuss, such as inflammatory or trolling remarks.",
   harassment: "Insults, threats, or targeted abuse aimed at a person or group.",
   off_topic: "Harmless but unrelated to the server's purpose.",
 };
 
-// export const ACTION_NEEDED = {
-//   ban: "When it's purely not worth keeping around.",
-//   timeout:"",
-//   kick:""
-// }
+const BAN_QUESTION = {
+  type: "noul",
+  instructions:
+    "Is this account clearly here only to spam, scam, or abuse people, with nothing worth keeping? " +
+    "Crypto or giveaway scams, phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
+    "A real person being rude, off-topic or asking for work is no.",
+} as const;
+
+const REMOVAL_CATEGORIES = Object.fromEntries(
+  [...CLASSIFIED_VIOLATIONS, "harassment"].map((c) => [
+    c,
+    MESSAGE_CATEGORIES[c as keyof typeof MESSAGE_CATEGORIES],
+  ]),
+);
+
+export const reasonFor = (category: string, confidence: number | undefined) =>
+  `${category.replace(/_/g, " ")} (Jev, ${Math.round((confidence ?? 0) * 100)}%)`;
 
 const messageForClassification = v.object({
   text: v.string(),
@@ -64,6 +78,48 @@ const messageClassification = v.object({
   probabilities: v.optional(v.record(v.string(), v.number())),
 });
 
+export const suggestReason = internalAction({
+  args: { discordMessageId: v.string() },
+  returns: v.string(),
+  handler: async (ctx, { discordMessageId }): Promise<string> => {
+    const message: Infer<typeof messageForClassification> | null =
+      await ctx.runQuery(internal.classify.getMessageByDiscordId, {
+        discordMessageId,
+      });
+    if (!message) return "Removed by a moderator";
+    const { answers } = await decide(
+      { message: message.text, author: message.author },
+      {
+        category: {
+          type: "choice",
+          instructions: "Why would a moderator remove this Discord message?",
+          criteria: REMOVAL_CATEGORIES,
+        },
+      },
+    );
+    const answer = answers.category;
+    if (answer.type !== "choice") return "Removed by a moderator";
+    return reasonFor(answer.choice, answer.confidence);
+  },
+});
+
+export const getMessageByDiscordId = internalQuery({
+  args: { discordMessageId: v.string() },
+  returns: v.union(v.null(), messageForClassification),
+  handler: async ({ db }, { discordMessageId }) => {
+    const message = await db
+      .query("messages")
+      .withIndex("id", (q) => q.eq("id", discordMessageId))
+      .unique();
+    if (!message || !message.cleanContent.trim()) return null;
+    const author = await db.get("users", message.authorId);
+    return {
+      text: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
+      author: author?.displayName ?? author?.username ?? "unknown",
+    };
+  },
+});
+
 /** Returns null when the message is missing or has no text (embeds, system messages). */
 export const classifyMessage = internalAction({
   args: { messageId: v.id("messages") },
@@ -91,20 +147,22 @@ export const classifyMessage = internalAction({
           instructions: "Which category best describes this Discord message?",
           criteria: MESSAGE_CATEGORIES,
         },
+        ban: BAN_QUESTION,
       },
     );
 
     const answer = answers.category;
     if (answer.type !== "choice")
       throw new Error("Jev returned an unexpected answer type");
+    const banScore = answers.ban.type === "noul" ? answers.ban.noul : 0;
     console.log(
-      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence})`,
+      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore})`,
     );
-    // Records any delete/timeout/kick this implies. Dry-run by default, see moderation.ts.
     await ctx.runMutation(internal.moderation.applyPolicy, {
       messageId,
       category: answer.choice,
       confidence: answer.confidence,
+      banScore,
     });
     // Long help requests in the /forwardfrom channel get their own support-forum post (guards live in followup.ts).
     if (

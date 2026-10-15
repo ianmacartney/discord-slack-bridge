@@ -1,7 +1,7 @@
 "use node";
 
 import { Infer, v } from "convex/values";
-import { ChannelType, EmbedBuilder } from "discord.js";
+import { ChannelFlags, ChannelType, EmbedBuilder } from "discord.js";
 import { internal } from "./_generated/api";
 import { ActionCtx, internalAction } from "./_generated/server";
 import { CARD_COLOR } from "./brandColors";
@@ -9,11 +9,13 @@ import { decide } from "./decisions";
 import { discordClient } from "./discord_node";
 import { forwardContext } from "./followup";
 import { limitPerPerson } from "./limits";
+import { chooseTags } from "./tags";
+import { isTopicTag } from "./tagDefinitions";
 
 // How sure Jev must be that the message deserves its own thread.
 const MIN_WORTH_A_THREAD = 0.7;
 // Discord limits a thread name to 100 characters and a message to 2000.
-const MAX_TITLE = 90;
+const MAX_TITLE = 50;
 const MAX_MESSAGE = 2000;
 
 /**
@@ -36,11 +38,10 @@ export const forwardToSupport = internalAction({
       {
         worth_a_thread: {
           type: "choice",
-          instructions:
-            "Should this chat message become its own support thread?",
+          instructions: "Is this a message that should open a support thread?",
           criteria: {
-            yes: "A detailed question or problem written out at length, from someone who is stuck or worried about it.",
-            no: "Short, casual, already answered, or not really a problem that needs follow-up.",
+            yes: "A real question or problem someone needs help with.",
+            no: "Casual chat, already answered, or nothing to follow up on.",
           },
         },
       },
@@ -105,8 +106,26 @@ async function openSupportPost(
       context.text.length > room
         ? `${context.text.slice(0, room)}…`
         : context.text;
+    const forumTags = forum.availableTags.map((t) => ({
+      id: t.id,
+      name: t.name,
+    }));
+    let { tagIds } = await chooseTags(
+      ctx,
+      context.guildId,
+      { title, messages: [context.text] },
+      forumTags,
+    ).catch((error) => {
+      console.error("choosing tags for a forwarded post failed", error);
+      return { tagIds: [] as string[] };
+    });
+    if (tagIds.length === 0 && forum.flags.has(ChannelFlags.RequireTag)) {
+      const fallback = forumTags.find(isTopicTag);
+      tagIds = fallback ? [fallback.id] : [];
+    }
     const thread = await forum.threads.create({
       name: title,
+      appliedTags: tagIds,
       message: {
         content: `${header}\n>>> ${quoted}`,
         allowedMentions: { users: [context.authorDiscordId] },

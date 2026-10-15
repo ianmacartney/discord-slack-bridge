@@ -1,11 +1,10 @@
 // Moderation policy: turns a message classification into delete/timeout/kick/ban actions.
-// Safe by default: dry-run is on, and kick/ban are never automatic, they always need a human approval.
 // The Discord side (executing, posting proposals) lives in moderation_node.ts.
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import {
-  env,
+  internalAction,
   internalMutation,
   internalQuery,
   MutationCtx,
@@ -26,8 +25,8 @@ const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
 const ALERT_DEDUPE_MS = 10 * 60 * 1000;
-
-export const isDryRun = () => env.MODERATION_DRY_RUN !== "false";
+export const BAN_DELETE_DAYS = 7;
+const CHAT_TIMEOUT_MINUTES = VIOLATION_TIMEOUT_MINUTES;
 
 export const get = internalQuery({
   args: { actionId: v.id("moderationActions") },
@@ -71,7 +70,6 @@ async function record(ctx: MutationCtx, action: NewAction) {
   const actionId = await ctx.db.insert("moderationActions", {
     ...action,
     status: "proposed",
-    dryRun: isDryRun(),
   });
   if (action.auto) {
     await ctx.scheduler.runAfter(0, internal.moderation_node.execute, {
@@ -104,17 +102,13 @@ async function countRecent(
   return recent.length;
 }
 
-/**
- * Deletes the message, times the person out for a day, and (once the timeout has run) posts a card in the mod channel
- * with Ban / Kick / Timeout / Warn buttons. Dry-run mode and the safety checks in moderation_node.ts apply to every
- * step, so staff and the server owner are never touched.
- */
 async function handleViolation(
   ctx: MutationCtx,
   messageId: Doc<"messages">["_id"],
   kind: string,
   confidence: number | undefined,
   reason: string,
+  ban = false,
 ) {
   const message = await ctx.db.get("messages", messageId);
   if (!message) return;
@@ -124,6 +118,29 @@ async function handleViolation(
     message.threadId ? ctx.db.get("threads", message.threadId) : null,
   ]);
   if (!author || !channel || author.bot) return;
+  const channelId = thread?.id ?? channel.id;
+  if (ban) {
+    const base = {
+      auto: true,
+      category: kind,
+      confidence,
+      targetDiscordUserId: author.id,
+      channelId,
+      discordMessageId: message.id,
+    };
+    await record(ctx, { ...base, action: "delete", reason });
+    const alreadyBanned =
+      (await countRecent(ctx, author.id, "ban", ALERT_DEDUPE_MS)) > 0;
+    if (!alreadyBanned) {
+      await record(ctx, {
+        ...base,
+        action: "ban",
+        deleteMessageDays: BAN_DELETE_DAYS,
+        reason,
+      });
+    }
+    return;
+  }
 
   const recent = await ctx.db
     .query("modAlerts")
@@ -133,7 +150,6 @@ async function handleViolation(
         .gt("_creationTime", Date.now() - ALERT_DEDUPE_MS),
     )
     .first();
-  const channelId = thread?.id ?? channel.id;
   const alertId =
     recent?._id ??
     (await ctx.db.insert("modAlerts", {
@@ -168,30 +184,37 @@ async function handleViolation(
 
 /**
  * Called after a message is classified.
- *  - A rule violation above its threshold (violations.ts): handled by handleViolation above.
  *  - harassment above the threshold: auto-delete the message and propose a 1-hour timeout for approval.
  *  - 5 flagged messages in 24 hours: propose a kick for approval.
- * Bans are never proposed here; moderators choose them on a card, or with `moderation:propose`.
  */
 export const applyPolicy = internalMutation({
   args: {
     messageId: v.id("messages"),
     category: v.string(),
     confidence: v.optional(v.number()),
+    banScore: v.optional(v.number()),
   },
   returns: v.null(),
-  handler: async (ctx, { messageId, category, confidence = 0 }) => {
+  handler: async (
+    ctx,
+    { messageId, category, confidence = 0, banScore = 0 },
+  ) => {
     const min = THRESHOLD_DEFAULTS;
     if (
       (CLASSIFIED_VIOLATIONS as readonly string[]).includes(category) &&
       confidence >= min[category as ThresholdName]
     ) {
+      const ban = banScore >= min.ban;
       await handleViolation(
         ctx,
         messageId,
         category,
         confidence,
-        `Classified as ${category} (confidence ${confidence.toFixed(2)})`,
+        `Classified as ${category} (confidence ${confidence.toFixed(2)})` +
+          (ban
+            ? `; Jev is ${Math.round(banScore * 100)}% sure this account is only here for that`
+            : ""),
+        ban,
       );
       return null;
     }
@@ -331,13 +354,13 @@ async function approveAndRun(
     action,
     auto: false,
     status: "approved",
-    dryRun: isDryRun(),
     reason,
     category: alert.kind,
     targetDiscordUserId: alert.targetDiscordUserId,
     channelId: alert.channelId,
     discordMessageId: alert.discordMessageId,
     durationMinutes,
+    deleteMessageDays: action === "ban" ? BAN_DELETE_DAYS : undefined,
     decidedBy,
     alertId: alert._id,
   });
@@ -346,22 +369,13 @@ async function approveAndRun(
   });
 }
 
-/**
- * Called by the Discord bot when a moderator presses a button on a mod-channel card. The bot checks their Discord
- * permissions first. Ban, kick, timeout and warn run right away (still subject to dry-run and the safety checks);
- * Dismiss lifts the automatic timeout.
- */
 export const decideAlert = apiMutation({
   args: {
     alertId: v.id("modAlerts"),
     choice: literals("ban", "kick", "timeout", "warn", "dismiss"),
     decidedBy: v.string(),
   },
-  returns: v.object({
-    ok: v.boolean(),
-    status: v.optional(v.string()),
-    dryRun: v.optional(v.boolean()),
-  }),
+  returns: v.object({ ok: v.boolean(), status: v.optional(v.string()) }),
   handler: async (ctx, { alertId, choice, decidedBy }) => {
     const alert = await ctx.db.get("modAlerts", alertId);
     if (!alert || alert.status !== "open") {
@@ -373,7 +387,6 @@ export const decideAlert = apiMutation({
       const timeout = alert.timeoutActionId
         ? await ctx.db.get("moderationActions", alert.timeoutActionId)
         : null;
-      // Only a timeout that really ran needs lifting. In dry-run mode nothing was done.
       if (timeout?.status === "executed") {
         await approveAndRun(
           ctx,
@@ -400,37 +413,86 @@ export const decideAlert = apiMutation({
       handledBy: decidedBy,
       handledAction: choice,
     });
-    return { ok: true, status: "handled", dryRun: isDryRun() };
+    return { ok: true, status: "handled" };
   },
 });
 
-/**
- * Bot: a moderator replied to a message with !ban or !timeout. Runs like a card's buttons: the safety checks in
- * moderation_node.ts still apply (never staff, the owner, bots or anyone ranked at or above the bot), and so does dry-run.
- */
 export const actFromChat = apiMutation({
   args: {
-    action: literals("ban", "timeout"),
+    action: literals("ban", "timeout", "kick"),
     targetDiscordUserId: v.string(),
     channelId: v.string(),
     discordMessageId: v.string(),
-    reason: v.string(),
-    durationMinutes: v.optional(v.number()),
-    deleteMessageDays: v.optional(v.number()),
+    reason: v.optional(v.string()),
     decidedBy: v.string(),
   },
-  returns: v.object({ dryRun: v.boolean() }),
-  handler: async (ctx, args) => {
-    const actionId = await ctx.db.insert("moderationActions", {
-      ...args,
+  returns: v.null(),
+  handler: async (ctx, { action, reason, ...target }) => {
+    const base = {
+      ...target,
       auto: false,
-      status: "approved",
-      dryRun: isDryRun(),
+      status: "approved" as const,
       category: "chat_command",
+      reason: reason ?? "",
+    };
+    const actionIds: Id<"moderationActions">[] = [];
+    if (action !== "ban") {
+      actionIds.push(
+        await ctx.db.insert("moderationActions", { ...base, action: "delete" }),
+      );
+    }
+    actionIds.push(
+      await ctx.db.insert("moderationActions", {
+        ...base,
+        action,
+        durationMinutes:
+          action === "timeout" ? CHAT_TIMEOUT_MINUTES : undefined,
+        deleteMessageDays: action === "ban" ? BAN_DELETE_DAYS : undefined,
+      }),
+    );
+    await ctx.scheduler.runAfter(0, internal.moderation.runChatCommand, {
+      actionIds,
     });
-    await ctx.scheduler.runAfter(0, internal.moderation_node.execute, {
-      actionId,
-    });
-    return { dryRun: isDryRun() };
+    return null;
+  },
+});
+
+export const runChatCommand = internalAction({
+  args: { actionIds: v.array(v.id("moderationActions")) },
+  returns: v.null(),
+  handler: async (ctx, { actionIds }): Promise<null> => {
+    const first: Doc<"moderationActions"> | null = await ctx.runQuery(
+      internal.moderation.get,
+      { actionId: actionIds[0] },
+    );
+    if (!first) return null;
+    let reason = first.reason;
+    if (!reason) {
+      reason = await ctx
+        .runAction(internal.classify.suggestReason, {
+          discordMessageId: first.discordMessageId!,
+        })
+        .catch((error) => {
+          console.error("Jev couldn't suggest a reason", error);
+          return "Removed by a moderator";
+        });
+    }
+    for (const actionId of actionIds) {
+      await ctx.runMutation(internal.moderation.setReason, {
+        actionId,
+        reason,
+      });
+      await ctx.runAction(internal.moderation_node.execute, { actionId });
+    }
+    return null;
+  },
+});
+
+export const setReason = internalMutation({
+  args: { actionId: v.id("moderationActions"), reason: v.string() },
+  returns: v.null(),
+  handler: async ({ db }, { actionId, reason }) => {
+    await db.patch("moderationActions", actionId, { reason });
+    return null;
   },
 });

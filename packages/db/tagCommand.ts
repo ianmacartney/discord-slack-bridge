@@ -1,5 +1,3 @@
-// /tags: moderators pick the support forum that Jev auto-tags (see convex/tags.ts) and manage its tags. Each tag is a
-// forum tag plus one line telling Jev when to use it, so adding, editing or deleting one updates both.
 import type { ConvexHttpClient } from "convex/browser";
 import { ConvexError } from "convex/values";
 import {
@@ -50,7 +48,9 @@ export const tagsCommand = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s
       .setName("add")
-      .setDescription("Add a tag to the forum and tell Jev when to use it")
+      .setDescription(
+        "Add a tag to the forum, optionally telling Jev when to use it",
+      )
       .addStringOption((o) =>
         o
           .setName("name")
@@ -60,22 +60,11 @@ export const tagsCommand = new SlashCommandBuilder()
       )
       .addStringOption((o) =>
         o
-          .setName("kind")
-          .setDescription(
-            "Type is what sort of post it is, area is what it's about",
-          )
-          .addChoices(
-            { name: "Type", value: "type" },
-            { name: "Area", value: "area" },
-          )
-          .setRequired(true),
-      )
-      .addStringOption((o) =>
-        o
           .setName("when")
-          .setDescription("When Jev should apply it, in plain words")
-          .setMaxLength(300)
-          .setRequired(true),
+          .setDescription(
+            "When Jev should apply it, in plain words (default: the name)",
+          )
+          .setMaxLength(300),
       )
       .addStringOption((o) =>
         o.setName("emoji").setDescription("An emoji, for example 🐛"),
@@ -114,23 +103,10 @@ export const tagsCommand = new SlashCommandBuilder()
       .setDescription("Remove tags from the forum and stop Jev using them")
       .addStringOption((o) =>
         o
-          .setName("tag")
-          .setDescription("A tag to remove")
+          .setName("tags")
+          .setDescription("One or more tags, separated by commas")
           .setAutocomplete(true)
           .setRequired(true),
-      )
-      // More tags to delete in the same go, each with the same suggestions.
-      .addStringOption((o) =>
-        o.setName("tag_2").setDescription("Another tag").setAutocomplete(true),
-      )
-      .addStringOption((o) =>
-        o.setName("tag_3").setDescription("Another tag").setAutocomplete(true),
-      )
-      .addStringOption((o) =>
-        o.setName("tag_4").setDescription("Another tag").setAutocomplete(true),
-      )
-      .addStringOption((o) =>
-        o.setName("tag_5").setDescription("Another tag").setAutocomplete(true),
       ),
   )
   .addSubcommand((s) =>
@@ -186,24 +162,6 @@ const currentTags = (forum: ForumChannel): GuildForumTagData[] =>
     emoji: t.emoji,
   }));
 
-/** Which of Jev's two questions (type or area) a tag belongs to, if any. */
-async function kindOf(
-  guild: Guild,
-  name: string,
-  convex: ConvexHttpClient,
-  apiToken: string,
-) {
-  const { type, area } = await convex.query(api.tagRules.list, {
-    guildId: guild.id,
-    apiToken,
-  });
-  const matches = (d: { tag: string | null }) =>
-    d.tag !== null && normalize(d.tag) === normalize(name);
-  if (type.some(matches)) return "type" as const;
-  if (area.some(matches)) return "area" as const;
-  return null;
-}
-
 async function addTag(
   interaction: ChatInputCommandInteraction,
   guild: Guild,
@@ -212,7 +170,7 @@ async function addTag(
 ) {
   const forum = await autoTagForum(guild, convex, apiToken);
   const name = interaction.options.getString("name", true).trim();
-  const kind = interaction.options.getString("kind", true) as "type" | "area";
+  const when = interaction.options.getString("when");
   const emojiInput = interaction.options.getString("emoji");
   const tags = currentTags(forum);
   if (!tags.some((t) => normalize(t.name) === normalize(name))) {
@@ -233,14 +191,15 @@ async function addTag(
       `Added by ${interaction.user.tag} with /tags add`,
     );
   }
-  await convex.mutation(api.tagRules.save, {
-    guildId: guild.id,
-    kind,
-    name,
-    when: interaction.options.getString("when", true),
-    apiToken,
-  });
-  return `Added the ${kind} tag "${name}" to <#${forum.id}>. Jev will use it on new posts.`;
+  if (when) {
+    await convex.mutation(api.tagRules.save, {
+      guildId: guild.id,
+      name,
+      when,
+      apiToken,
+    });
+  }
+  return `Added the tag "${name}" to <#${forum.id}>. Jev will use it on new posts.`;
 }
 
 async function editTag(
@@ -287,12 +246,9 @@ async function editTag(
       `Edited by ${interaction.user.tag} with /tags edit`,
     );
   }
-  // Keep Jev's description in step with the forum tag.
-  const kind = await kindOf(guild, tag.name, convex, apiToken);
-  if (kind && (newName || when)) {
+  if (when || newName) {
     await convex.mutation(api.tagRules.save, {
       guildId: guild.id,
-      kind,
       name: tag.name,
       newName: newName ?? undefined,
       when: when ?? undefined,
@@ -311,9 +267,11 @@ async function deleteTags(
   const forum = await autoTagForum(guild, convex, apiToken);
   const names = [
     ...new Set(
-      ["tag", "tag_2", "tag_3", "tag_4", "tag_5"]
-        .map((option) => interaction.options.getString(option)?.trim())
-        .filter((name): name is string => !!name),
+      interaction.options
+        .getString("tags", true)
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean),
     ),
   ];
   const tags = currentTags(forum);
@@ -322,20 +280,16 @@ async function deleteTags(
   const keep = new Set(tags);
   for (const name of names) {
     const tag = tags.find((t) => normalize(t.name) === normalize(name));
-    const kind = await kindOf(guild, name, convex, apiToken);
-    if (!tag && !kind) {
+    const described = await convex.mutation(api.tagRules.remove, {
+      guildId: guild.id,
+      name,
+      apiToken,
+    });
+    if (!tag && !described) {
       notFound.push(name);
       continue;
     }
     if (tag) keep.delete(tag);
-    if (kind) {
-      await convex.mutation(api.tagRules.remove, {
-        guildId: guild.id,
-        kind,
-        name,
-        apiToken,
-      });
-    }
     deleted.push(tag?.name ?? name);
   }
   if (deleted.length === 0) {
@@ -374,14 +328,10 @@ async function deleteAllTags(
   const tags = currentTags(forum);
   const keep = tags.filter((t) => t.id === resolvedTagId);
   const remove = tags.filter((t) => t.id !== resolvedTagId);
-  const { type, area } = await convex.query(api.tagRules.list, {
+  const rules = await convex.query(api.tagRules.list, {
     guildId: guild.id,
     apiToken,
   });
-  const rules = [
-    ...type.map((d) => ({ ...d, kind: "type" as const })),
-    ...area.map((d) => ({ ...d, kind: "area" as const })),
-  ].filter((d) => d.tag);
   if (remove.length === 0 && rules.length === 0) {
     throw new UserError("There are no tags to delete.");
   }
@@ -425,18 +375,13 @@ async function deleteAllTags(
   for (const d of rules) {
     await convex.mutation(api.tagRules.remove, {
       guildId: guild.id,
-      kind: d.kind,
-      name: d.tag!,
+      name: d.tag,
       apiToken,
     });
   }
   return `Deleted all ${remove.length} tags from <#${forum.id}>${keep.length ? ", kept Resolved" : ""}. Jev won't tag posts until tags are added again.`;
 }
 
-/**
- * Suggestions for the `tag` option of /tags edit and delete: the support forum's tags plus the ones Jev knows about,
- * filtered by what's typed so far. Discord shows at most 25.
- */
 export async function handleTagsAutocomplete(
   interaction: AutocompleteInteraction,
   convex: ConvexHttpClient,
@@ -444,24 +389,22 @@ export async function handleTagsAutocomplete(
 ) {
   const guild = interaction.guild;
   if (!guild) return interaction.respond([]);
-  const typed = normalize(interaction.options.getFocused());
-  const names = new Set<string>();
-  try {
-    const forum = await autoTagForum(guild, convex, apiToken).catch(() => null);
-    for (const t of forum?.availableTags ?? []) names.add(t.name);
-    const { type, area } = await convex.query(api.tagRules.list, {
-      guildId: guild.id,
-      apiToken,
-    });
-    for (const d of [...type, ...area]) if (d.tag) names.add(d.tag);
-  } catch (e) {
-    console.error(e);
-  }
+  const focused = interaction.options.getFocused(true);
+  const parts = focused.value.split(",");
+  const typed = normalize(parts.pop() ?? "");
+  const already = parts.map((p) => p.trim()).filter(Boolean);
+  const prefix = already.length ? `${already.join(", ")}, ` : "";
+  const forum = await autoTagForum(guild, convex, apiToken).catch(() => null);
+  const names = (forum?.availableTags ?? [])
+    .map((t) => t.name)
+    .filter((name) => !already.some((a) => normalize(a) === normalize(name)));
   await interaction.respond(
-    [...names]
+    names
       .filter((name) => normalize(name).includes(typed))
+      .map((name) => `${prefix}${name}`)
+      .filter((value) => value.length <= 100)
       .slice(0, 25)
-      .map((name) => ({ name, value: name })),
+      .map((value) => ({ name: value, value })),
   );
 }
 
