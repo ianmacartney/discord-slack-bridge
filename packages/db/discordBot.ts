@@ -194,10 +194,15 @@ bot.on("threadCreate", async (thread) => {
         components: [actionRow],
       });
 
-      const owner = thread.ownerId
-        ? await thread.guild.members.fetch(thread.ownerId).catch(() => null)
+      const starter =
+        thread.ownerId === bot.user?.id
+          ? await thread.fetchStarterMessage().catch(() => null)
+          : null;
+      const askerId = starter?.mentions.users.first()?.id ?? thread.ownerId;
+      const asker = askerId
+        ? await thread.guild.members.fetch(askerId).catch(() => null)
         : null;
-      if (verifiedRoleId && !owner?.roles.cache.has(verifiedRoleId)) {
+      if (verifiedRoleId && !asker?.roles.cache.has(verifiedRoleId)) {
         await thread.send({
           embeds: [
             new EmbedBuilder()
