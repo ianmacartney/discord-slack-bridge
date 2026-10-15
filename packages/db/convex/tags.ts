@@ -13,7 +13,7 @@ import { decide, JevQuestion } from "./decisions";
 import { THRESHOLD_DEFAULTS } from "./violations";
 import { TagDecisions } from "./schema";
 import {
-  DEFAULT_WHEN,
+  defaultWhen,
   isTopicTag,
   MAX_APPLIED_TAGS,
   normalize,
@@ -44,7 +44,7 @@ export async function chooseTags(
   const questions: Record<string, JevQuestion> = {};
   for (const t of candidates) {
     const key = normalize(t.name);
-    const when = rules[key]?.when ?? DEFAULT_WHEN[key] ?? t.name;
+    const when = rules[key]?.when ?? defaultWhen[key] ?? t.name;
     questions[t.id] = {
       type: "noul",
       instructions: `Does the forum tag "${t.name}" apply to this post? It applies when: ${when}`,

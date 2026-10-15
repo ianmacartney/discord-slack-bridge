@@ -174,9 +174,11 @@ async function logAutoAction(
   note?: string,
 ) {
   const fromChatCommand = action.category === "chat_command";
-  if (!action.auto && !fromChatCommand) return;
-  // A card (postAlertCard) reports on these, so only a skip needs its own log line.
-  if (action.alertId && outcome !== "skipped") return;
+  // A moderator's pick from a card or a chat command is always reported, so a blocked ban is never silent.
+  if (!action.auto && !fromChatCommand && outcome !== "skipped") return;
+  // A timeout's card is posted by postAlertCard; every other outcome gets a line here.
+  if (action.alertId && action.action === "timeout" && outcome !== "skipped")
+    return;
   if (action.action === "delete" && outcome !== "skipped") return;
   try {
     const modChannelId: string | null = await ctx.runQuery(
@@ -189,7 +191,7 @@ async function logAutoAction(
     const embed = new EmbedBuilder()
       .setColor(OUTCOME_CARD[outcome].color)
       .setTitle(
-        `${fromChatCommand ? "Moderator" : "Automatic"} ${action.action}${OUTCOME_CARD[outcome].titleSuffix}`,
+        `${action.decidedBy ? "Moderator" : "Automatic"} ${action.action}${OUTCOME_CARD[outcome].titleSuffix}`,
       )
       .addFields(
         {
@@ -215,7 +217,7 @@ async function logAutoAction(
               },
             ]
           : []),
-        ...(fromChatCommand && action.decidedBy
+        ...(action.decidedBy
           ? [{ name: "By", value: `<@${action.decidedBy}>`, inline: true }]
           : []),
         { name: "Reason", value: action.reason },

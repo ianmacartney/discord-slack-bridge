@@ -301,7 +301,7 @@ bot.on("interactionCreate", async (interaction) => {
                 .setColor(CARD_COLOR.muted)
                 .setFooter({
                   text: result.ok
-                    ? `${label} by ${interaction.user.username}`
+                    ? `${label} requested by ${interaction.user.username}, see the mod channel`
                     : `Already handled (${result.status ?? "not found"})`,
                 }),
             ]

@@ -1,4 +1,4 @@
-export const DEFAULT_WHEN: Record<string, string> = {
+export const defaultWhen: Record<string, string> = {
   bugreport:
     "Something that should work is failing: an error message, crash, wrong result, or regression.",
   featurerequest:
@@ -26,9 +26,9 @@ export const DEFAULT_WHEN: Record<string, string> = {
   other: "A real support question that fits none of the other tags.",
 };
 
-const NEVER_AUTO_TAG = ["resolved", "closed", "duplicate"];
+const neverAutoTag = ["resolved", "closed", "duplicate"];
 export const isTopicTag = (tag: { name: string }) =>
-  !NEVER_AUTO_TAG.includes(normalize(tag.name));
+  !neverAutoTag.includes(normalize(tag.name));
 
 export const MAX_APPLIED_TAGS = 5;
 
