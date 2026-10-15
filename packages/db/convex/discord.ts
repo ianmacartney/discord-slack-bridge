@@ -12,6 +12,7 @@ import {
   env,
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
+import { inviteCodes } from "./violations";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -19,7 +20,6 @@ import {
   DiscordUser,
 } from "./schema";
 
-/** An order-independent fingerprint of a forum's tags, so we only write when they actually changed. */
 function tagSignature(tags: DiscordChannel["availableTags"]) {
   return (tags ?? [])
     .map(
@@ -42,7 +42,6 @@ const getOrCreate = async <TableName extends DiscordRelatedTables>(
     .unique();
 
   if (existing) {
-    // TODO: update fields if they have changed
     return existing._id;
   }
   return await db.insert(table, doc);
@@ -52,7 +51,6 @@ const touchThread = async (
   { db }: { db: DatabaseWriter },
   { threadId }: { threadId: Id<"threads"> },
 ) => {
-  // Get maximum version from any thread.
   const mostRecent = await db
     .query("threads")
     .withIndex("version")
@@ -62,7 +60,6 @@ const touchThread = async (
   await db.patch("threads", threadId, { version: nextVersion });
 };
 
-// Generic over the table, which Convex validators can't express.
 // eslint-disable-next-line @convex-dev/require-args-validator
 export const addUniqueDoc = internalMutation({
   handler: async <TableName extends DiscordRelatedTables>(
@@ -102,7 +99,6 @@ export const forceRefreshVersions = internalMutation({
   },
 });
 
-// Takes [author, message] tuples, which Convex validators can't express.
 // eslint-disable-next-line @convex-dev/require-args-validator
 export const addThreadBatch = internalMutation({
   handler: async (
@@ -139,16 +135,11 @@ export const receiveMessage = apiMutation({
   },
   handler: async (ctx, { author, message, channel, thread }) => {
     if (!message.content) {
-      // We auto-reply with a special message that doesn't show up as content.
-      // This races with the original message, causing issues with duplicate
-      // Slack threads getting started, so just skip them here.
       return;
     }
     const authorId = await getOrCreate(ctx.db, "users", author);
     const channelId = await getOrCreate(ctx.db, "channels", channel);
     let dbChannel = (await ctx.db.get("channels", channelId))!;
-    // getOrCreate never updates an existing row, so keep a forum's tag list fresh: auto-tagging and the
-    // resolved-tag check both read it, and tags are often added after the forum was first seen.
     if (
       tagSignature(dbChannel.availableTags) !==
       tagSignature(channel.availableTags)
@@ -171,17 +162,13 @@ export const receiveMessage = apiMutation({
       threadId,
     });
 
-    // A forum post's first message has the same id as the post itself, so this runs once per new post and never
-    // for replies. It only does anything in the forum chosen with /tags (see tags.ts).
     if (threadId && thread && message.id === thread.id) {
       await ctx.scheduler.runAfter(0, internal.tags.tagNewPost, { threadId });
     }
 
-    // Rule 5: @everyone and @here. Checked exactly, no AI: delete, time out, and post a card recommending a ban.
     if (
       !author.bot &&
       (message.type === 0 || message.type === 19) &&
-      // Not preceded by a word character, so "jane@here.example" is not a mention.
       /(^|\W)@(everyone|here)\b/.test(message.content)
     ) {
       await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
@@ -189,19 +176,26 @@ export const receiveMessage = apiMutation({
       });
     }
 
-    // Classify ordinary messages (0: DEFAULT, 19: REPLY) with Jev. The verdict is only logged for now.
+    const codes = inviteCodes(message.content);
+    if (
+      !author.bot &&
+      (message.type === 0 || message.type === 19) &&
+      codes.length
+    ) {
+      await ctx.scheduler.runAfter(0, internal.moderation_node.checkInvites, {
+        messageId,
+        channelId: thread?.id ?? channel.id,
+        codes,
+      });
+    }
+
     if (!author.bot && (message.type === 0 || message.type === 19)) {
       await ctx.scheduler.runAfter(0, internal.classify.classifyMessage, {
         messageId,
       });
     }
 
-    // If the message is in a channel with an associated Slack channel, forward
-    // it to that Slack channel.
-    //
-    // TODO: handle message type USER_JOIN
     if (
-      // 0: DEFAULT 19: REPLY
       (message.type === 0 || message.type === 19) &&
       dbChannel.slackChannelId
     ) {
@@ -227,13 +221,8 @@ function makeLinkUrl(dbThread: Doc<"threads"> | undefined) {
     : undefined;
 }
 
-// Validation is deliberately off until `partial` lands, see the TODO below.
 // eslint-disable-next-line @convex-dev/require-args-validator
 export const updateMessage = mutation({
-  // TODO: turn on validation after rollout & `partial` implementation
-  // args: {
-  //   message: v.object(partial(DiscordMessage))),
-  // },
   handler: async (
     { db, scheduler },
     {
@@ -242,7 +231,6 @@ export const updateMessage = mutation({
     }: { message: Partial<DiscordMessage> & { id: string }; apiToken: string },
   ) => {
     if (apiToken !== env.CONVEX_API_TOKEN) {
-      // TODO: just use apiMutation once we have arg validation here.
       throw new Error("Invalid API token");
     }
     const existing = await db
@@ -259,7 +247,6 @@ export const updateMessage = mutation({
         throw new Error("Thread not found:" + threadId);
       }
     }
-    // Overwrite authorId & channelId
     await db.patch("messages", existing._id, {
       ...message,
       authorId,
@@ -325,7 +312,7 @@ function threadSlackParams(channel: Doc<"channels">, thread: Doc<"threads">) {
   return {
     channel: channel.slackChannelId,
     channelName: channel.name,
-    threadTs: thread.slackThreadTs!, // ! is a bit of a lie
+    threadTs: thread.slackThreadTs!,
     title: thread.name + (thread.archived ? " (archived)" : ""),
     linkUrl: makeLinkUrl(thread),
     emojis:
@@ -354,7 +341,6 @@ export const updateThread = apiMutation({
       !existing.appliedTags.includes(resolvedTagId) &&
       thread.appliedTags.includes(resolvedTagId);
     await db.patch("threads", existing._id, thread);
-    // A post the bot opened from a chat message was resolved: thumbs up on that original message.
     if (nowResolved) {
       const forward = await db
         .query("helpForwards")
@@ -394,21 +380,15 @@ export const deleteThread = apiMutation({
     const channel = await db.get("channels", existing.channelId);
     if (!channel) throw new Error("Channel not found:" + existing.channelId);
     if (channel.slackChannelId && existing.slackThreadTs) {
-      // For now let's keep it around but just mark it as archived.
       await scheduler.runAfter(
         0,
         internal.slack_node.updateThread,
         threadSlackParams(channel, { ...existing, archived: true }),
       );
-      //   await scheduler.runAfter(0, internal.slack_node.deleteMessage, {
-      //     messageTs: existing.slackThreadTs,
-      //     channel: channel.slackChannelId,
-      //   });
     }
   },
 });
 
-// To refresh the info of all threads, if we change the format e.g.
 export const refreshThreads = internalMutation({
   args: {},
   handler: async (ctx) => {

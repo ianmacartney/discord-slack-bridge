@@ -1,30 +1,21 @@
-// Rule violations that get the full treatment: the message is deleted, the person is timed out for a day, and a
-// card with action buttons is posted in the mod channel. Pure data with no Convex imports, shared by the policy and
-// the cards.
-
-/** How long the automatic timeout lasts. */
 export const VIOLATION_TIMEOUT_MINUTES = 24 * 60;
-/** The Timeout button on a card applies a longer one. */
 export const MOD_TIMEOUT_MINUTES = 7 * 24 * 60;
 
-/**
- * How confident Jev must be before the bot acts.
- * The first five are the violations that get the full treatment (delete, timeout, card).
- */
 export const THRESHOLD_DEFAULTS = {
   spam: 0.95,
   nsfw_or_violent: 0.9,
   job_solicitation: 0.9,
   piracy_or_secrets: 0.9,
   fraud_or_illegal: 0.9,
-  harassment: 0.9, // deleted, with a proposed timeout
+  harassment: 0.9,
   ban: 0.95,
-  needs_help: 0.8, // gets the follow-up reply
+  dm_solicitation: 0.8,
+  convex_self_promo: 0.9,
+  needs_help: 0.8,
   tag: 0.5,
 };
 export type ThresholdName = keyof typeof THRESHOLD_DEFAULTS;
 
-/** Classifier categories (see MESSAGE_CATEGORIES in classify.ts) that count as violations. */
 export const CLASSIFIED_VIOLATIONS = [
   "spam",
   "nsfw_or_violent",
@@ -33,7 +24,6 @@ export const CLASSIFIED_VIOLATIONS = [
   "fraud_or_illegal",
 ] as const;
 
-/** Card titles, including the one violation that isn't classified: @everyone / @here. */
 export const VIOLATION_TITLES: Record<string, string> = {
   spam: "Spam detected",
   nsfw_or_violent: "NSFW, violent or doxxing content detected",
@@ -41,4 +31,12 @@ export const VIOLATION_TITLES: Record<string, string> = {
   piracy_or_secrets: "Piracy or leaked keys detected",
   fraud_or_illegal: "Fraud or illegal activity detected",
   mass_mention: "@everyone or @here used",
+  discord_invite: "Invite to another Discord server",
 };
+
+export const inviteCodes = (text: string) =>
+  [
+    ...text.matchAll(
+      /(?:discord\.gg|discord(?:app)?\.com\/invite)\/([\w-]+)/gi,
+    ),
+  ].map((m) => m[1]);

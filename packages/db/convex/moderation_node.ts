@@ -5,6 +5,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  Channel,
   Client,
   EmbedBuilder,
   Guild,
@@ -18,13 +19,11 @@ import { CARD_COLOR } from "./brandColors";
 import { VIOLATION_TITLES } from "./violations";
 import { discordClient } from "./discord_node";
 
-// Bot permissions
 export const ACTION_PERMISSION = {
   delete: P.ManageMessages,
   timeout: P.ModerateMembers,
   kick: P.KickMembers,
   ban: P.BanMembers,
-  // A warning is a DM, which needs no server permission; viewing the channel is just a harmless check.
   warn: P.ViewChannel,
   untimeout: P.ModerateMembers,
 } as const;
@@ -37,11 +36,6 @@ const MODERATOR_PERMISSIONS = [
   P.ModerateMembers,
 ];
 
-/**
- * Returns why this target must not be moderated, or null if it is fine to proceed.
- * These checks run at execution time against live Discord data, on top of Discord's own rules
- * (nobody can ban, kick or time out the server owner).
- */
 function safetyBlock(
   guild: Guild,
   targetId: string,
@@ -54,7 +48,7 @@ function safetyBlock(
   if (exempt.includes(targetId)) return "target is on the exempt list";
   if (targetId === me.id) return "target is the moderation bot itself";
   if (targetId === guild.ownerId) return "target is the server owner";
-  if (!member) return null; // Already left; only a message delete can still apply.
+  if (!member) return null;
   if (member.user.bot && env.MODERATION_ALLOW_BOT_TARGETS !== "true")
     return "target is a bot";
   if (member.permissions.any(MODERATOR_PERMISSIONS))
@@ -86,7 +80,6 @@ async function postAlertCard(
     if (!channel || !("send" in channel)) return;
 
     const quote = alert.content.slice(0, 900) || "(no text)";
-    // NSFW text is hidden behind a spoiler, so moderators choose whether to read it.
     const shown = alert.kind === "nsfw_or_violent" ? `||${quote}||` : quote;
     const embed = new EmbedBuilder()
       .setColor(CARD_COLOR.danger)
@@ -150,7 +143,47 @@ async function postAlertCard(
   }
 }
 
-// How each outcome of an automatic action looks in the mod channel.
+const REMINDER_SECONDS = 30;
+const REMINDERS: Record<string, (rules: string, selfPromo: string) => string> =
+  {
+    dm_solicitation: (rules) =>
+      `Per the ${rules}, please don't DM people, that might lead to a ban.`,
+    convex_self_promo: (_, selfPromo) =>
+      `Thanks for sharing! Convex projects go in ${selfPromo}, please post it there.`,
+  };
+
+async function postReminder(
+  ctx: ActionCtx,
+  guild: Guild,
+  channel: Channel,
+  action: Doc<"moderationActions">,
+) {
+  const text = REMINDERS[action.category ?? ""];
+  if (!text || !action.auto || !("send" in channel)) return;
+  try {
+    const { rulesChannelId, selfPromoChannelId } = await ctx.runQuery(
+      internal.guildSettings.reminderChannelsFor,
+      { guildId: guild.id },
+    );
+    const rules = rulesChannelId ?? guild.rulesChannelId;
+    const sent = await channel.send({
+      content: `<@${action.targetDiscordUserId}> ${text(
+        rules ? `<#${rules}>` : "#rules",
+        selfPromoChannelId
+          ? `<#${selfPromoChannelId}>`
+          : "the self-promo channel",
+      )}`,
+      allowedMentions: { users: [action.targetDiscordUserId] },
+    });
+    await new Promise((resolve) =>
+      setTimeout(resolve, REMINDER_SECONDS * 1000),
+    );
+    await sent.delete();
+  } catch (error) {
+    console.error("couldn't post a reminder", error);
+  }
+}
+
 const OUTCOME_CARD = {
   executed: {
     color: CARD_COLOR.danger,
@@ -174,9 +207,7 @@ async function logAutoAction(
   note?: string,
 ) {
   const fromChatCommand = action.category === "chat_command";
-  // A moderator's pick from a card or a chat command is always reported, so a blocked ban is never silent.
   if (!action.auto && !fromChatCommand && outcome !== "skipped") return;
-  // A timeout's card is posted by postAlertCard; every other outcome gets a line here.
   if (action.alertId && action.action === "timeout" && outcome !== "skipped")
     return;
   if (action.action === "delete" && outcome !== "skipped") return;
@@ -232,7 +263,6 @@ async function logAutoAction(
   }
 }
 
-/** Runs one recorded action: auto actions run straight away, others only after a human approved them. */
 export const execute = internalAction({
   args: { actionId: v.id("moderationActions") },
   returns: v.null(),
@@ -303,7 +333,6 @@ export const execute = internalAction({
       } else if (action.action === "untimeout") {
         await member!.timeout(null, reason);
       } else if (action.action === "warn") {
-        // A DM. If their DMs are closed this throws, and the action is recorded as failed with that reason.
         await member!.send({
           embeds: [
             new EmbedBuilder()
@@ -317,7 +346,6 @@ export const execute = internalAction({
       } else if (action.action === "kick") {
         await member!.kick(reason);
       } else {
-        // guild.bans works whether or not they are still in the server.
         await guild.bans.create(action.targetDiscordUserId, {
           reason,
           deleteMessageSeconds: (action.deleteMessageDays ?? 0) * 24 * 60 * 60,
@@ -325,7 +353,9 @@ export const execute = internalAction({
       }
       await postAlertCard(ctx, bot, guild, action);
       await logAutoAction(ctx, bot, guild, action, "executed");
-      return await finish("executed");
+      await finish("executed");
+      await postReminder(ctx, guild, channel, action);
+      return null;
     } catch (error) {
       return await finish(
         "failed",
@@ -337,7 +367,35 @@ export const execute = internalAction({
   },
 });
 
-/** Posts a proposal with Approve / Reject buttons in the mod channel. The bot process handles the clicks. */
+export const checkInvites = internalAction({
+  args: {
+    messageId: v.id("messages"),
+    channelId: v.string(),
+    codes: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { messageId, channelId, codes }): Promise<null> => {
+    const bot = await discordClient();
+    try {
+      const channel = await bot.channels.fetch(channelId);
+      const guildId = channel && "guild" in channel ? channel.guild.id : null;
+      for (const code of codes) {
+        const invite = await bot.fetchInvite(code).catch(() => null);
+        if (!guildId || invite?.guild?.id !== guildId) {
+          await ctx.runMutation(internal.moderation.banForInvite, {
+            messageId,
+            code,
+          });
+          return null;
+        }
+      }
+    } finally {
+      await bot.destroy();
+    }
+    return null;
+  },
+});
+
 export const postProposal = internalAction({
   args: { actionId: v.id("moderationActions") },
   returns: v.null(),
@@ -349,7 +407,6 @@ export const postProposal = internalAction({
     if (!action || action.status !== "proposed" || action.auto) return null;
     const bot = await discordClient();
     try {
-      // The mod channel is per server (set with /modchannel), so find the server the message came from.
       const source = await bot.channels.fetch(action.channelId);
       const guildId = source && "guild" in source ? source.guild.id : null;
       const modChannelId: string | null = await ctx.runQuery(

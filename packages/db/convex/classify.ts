@@ -1,6 +1,3 @@
-// Jev-backed message classifier. classifyMessage runs on every new message (see receiveMessage in discord.ts).
-// It can also be called by hand, for example:
-//   npx convex run classify:classifyMessage '{"messageId": "..."}'
 import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalQuery } from "./_generated/server";
@@ -14,8 +11,10 @@ export const MESSAGE_CATEGORIES = {
   needs_help:
     "Someone is asking for help or reporting a problem they want solved.",
   spam:
-    "Unsolicited promotion, scams, repeated junk, bot-like repetition, repeated self-promotion, " +
-    "or links with no relevance to the conversation.",
+    "Unsolicited promotion, scams, repeated junk, bot-like repetition, self-promotion unrelated to Convex, " +
+    "phishing or scam links, or links with no relevance to the conversation.",
+  convex_self_promo:
+    "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",
   nsfw_or_violent:
     "NSFW content, graphic violence, discrimination, or doxxing (sharing someone's personal information).",
   job_solicitation:
@@ -36,6 +35,13 @@ const BAN_QUESTION = {
     "Is this account clearly here only to spam, scam, or abuse people, with nothing worth keeping? " +
     "Crypto or giveaway scams, phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
     "A real person being rude, off-topic or asking for work is no.",
+} as const;
+
+const DM_QUESTION = {
+  type: "noul",
+  instructions:
+    "Is this message telling someone to check their DMs, saying the author sent them a DM, " +
+    "or asking people to DM the author?",
 } as const;
 
 const REMOVAL_CATEGORIES = Object.fromEntries(
@@ -120,7 +126,6 @@ export const getMessageByDiscordId = internalQuery({
   },
 });
 
-/** Returns null when the message is missing or has no text (embeds, system messages). */
 export const classifyMessage = internalAction({
   args: { messageId: v.id("messages") },
   returns: v.union(v.null(), messageClassification),
@@ -148,6 +153,7 @@ export const classifyMessage = internalAction({
           criteria: MESSAGE_CATEGORIES,
         },
         ban: BAN_QUESTION,
+        dm: DM_QUESTION,
       },
     );
 
@@ -155,16 +161,17 @@ export const classifyMessage = internalAction({
     if (answer.type !== "choice")
       throw new Error("Jev returned an unexpected answer type");
     const banScore = answers.ban.type === "noul" ? answers.ban.noul : 0;
+    const dmScore = answers.dm.type === "noul" ? answers.dm.noul : 0;
     console.log(
-      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore})`,
+      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore}, dm ${dmScore})`,
     );
     await ctx.runMutation(internal.moderation.applyPolicy, {
       messageId,
       category: answer.choice,
       confidence: answer.confidence,
       banScore,
+      dmScore,
     });
-    // Long help requests in the /forwardfrom channel get their own support-forum post (guards live in followup.ts).
     if (
       answer.choice === "needs_help" &&
       (answer.confidence ?? 0) >= THRESHOLD_DEFAULTS.needs_help
