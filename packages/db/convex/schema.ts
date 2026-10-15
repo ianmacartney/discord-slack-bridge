@@ -113,7 +113,8 @@ export const Users = Table("users", {
 
 export const Registrations = Table("registrations", {
   discordUserId: v.string(),
-  associatedAccountId: v.string(),
+  associatedAccountId: v.optional(v.string()),
+  teamName: v.optional(v.string()),
 });
 
 export const Tickets = Table("tickets", {

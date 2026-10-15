@@ -1,13 +1,14 @@
 import { internal } from "./_generated/api";
 import {
   internalMutation,
+  DatabaseReader,
   DatabaseWriter,
   httpAction,
   internalQuery,
   env,
 } from "./_generated/server";
 import { v } from "convex/values";
-import { apiAction } from "./apiFunctions";
+import { apiAction, apiMutation } from "./apiFunctions";
 
 export const registerAccountHandler = httpAction(async (ctx, request) => {
   authorizeWebhookRequest(request);
@@ -66,10 +67,38 @@ export const insertRegistration = internalMutation({
     associatedAccountId: v.string(),
   },
   handler: async ({ db }, { discordUserId, associatedAccountId }) => {
+    const teamName = (await getRegistration(db, discordUserId))?.teamName;
     await deleteRegistrations(db, discordUserId);
-    await db.insert("registrations", { discordUserId, associatedAccountId });
+    await db.insert("registrations", {
+      discordUserId,
+      associatedAccountId,
+      teamName,
+    });
   },
 });
+
+// /verify in the Discord bot: the member says they're here for help, optionally with their team name.
+export const verifyMember = apiMutation({
+  args: {
+    discordUserId: v.string(),
+    teamName: v.optional(v.string()),
+  },
+  handler: async ({ db }, { discordUserId, teamName }) => {
+    const existing = await getRegistration(db, discordUserId);
+    if (existing) {
+      await db.patch("registrations", existing._id, { teamName });
+    } else {
+      await db.insert("registrations", { discordUserId, teamName });
+    }
+  },
+});
+
+function getRegistration(db: DatabaseReader, discordUserId: string) {
+  return db
+    .query("registrations")
+    .withIndex("discordUserId", (q) => q.eq("discordUserId", discordUserId))
+    .first();
+}
 
 export const deleteRegistration = internalMutation({
   args: {

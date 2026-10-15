@@ -9,6 +9,7 @@ import {
   EmbedBuilder,
   GatewayIntentBits,
   PermissionFlagsBits,
+  SlashCommandBuilder,
   StringSelectMenuBuilder,
 } from "discord.js";
 import { api } from "./convex/_generated/api.js";
@@ -58,6 +59,8 @@ if (!autoReplyChannelId) {
   }
 }
 
+const verifiedRoleId = process.env.VERIFICATION_ROLE_ID;
+
 const deploymentUrl = process.env.CONVEX_URL;
 if (!deploymentUrl) throw new Error("Specify CONVEX_URL as an env variable");
 console.log(`Server address: ${deploymentUrl}`);
@@ -97,6 +100,27 @@ bot.on("ready", async () => {
       await registerChannelSettingCommands(guild);
     } catch (e) {
       console.error(`Could not register channel commands in ${guild.name}:`, e);
+    }
+    if (verifiedRoleId) {
+      try {
+        await guild.commands.create(
+          new SlashCommandBuilder()
+            .setName("verify")
+            .setDescription(
+              "Confirm you're here with a genuine question, so you can post in the questions forum",
+            )
+            .addStringOption((o) =>
+              o
+                .setName("team")
+                .setDescription("Your Convex team name, if you have one")
+                .setMaxLength(100),
+            )
+            .setDMPermission(false)
+            .toJSON(),
+        );
+      } catch (e) {
+        console.error(`Could not register /verify in ${guild.name}:`, e);
+      }
     }
   }
 });
@@ -168,6 +192,15 @@ bot.on("threadCreate", async (thread) => {
   console.log(`new thread ${thread.id} "${thread.name}" in ${thread.parentId}`);
   if (autoReplyChannelId && thread.parentId === autoReplyChannelId) {
     try {
+      const owner = thread.ownerId
+        ? await thread.guild.members.fetch(thread.ownerId).catch(() => null)
+        : null;
+      if (verifiedRoleId && !owner?.roles.cache.has(verifiedRoleId)) {
+        await thread.send(
+          `<@${thread.ownerId}>, please run \`/verify\` first (with your team name if you have one), then post your question again.`,
+        );
+        return;
+      }
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
         Reminder: If you have a [Convex Pro account](https://www.convex.dev/pricing), use the [Convex Dashboard](https://dashboard.convex.dev/) to file support tickets.
@@ -270,6 +303,35 @@ bot.on("interactionCreate", async (interaction) => {
     interaction.commandName === "forwardfrom"
   ) {
     await handleForwardFromCommand(interaction, convex, apiToken);
+    return;
+  }
+
+  if (
+    interaction.isChatInputCommand() &&
+    interaction.commandName === "verify" &&
+    verifiedRoleId
+  ) {
+    try {
+      await convex.mutation(api.verification.verifyMember, {
+        discordUserId: interaction.user.id,
+        teamName: interaction.options.getString("team")?.trim() || undefined,
+        apiToken,
+      });
+      const member = await interaction.guild!.members.fetch(
+        interaction.user.id,
+      );
+      await member.roles.add(verifiedRoleId);
+      await interaction.reply({
+        content: `Thanks, you're verified${autoReplyChannelId ? ` and can post in <#${autoReplyChannelId}>` : ""}.`,
+        ephemeral: true,
+      });
+    } catch (e) {
+      console.error(e);
+      await interaction.reply({
+        content: "Something went wrong.",
+        ephemeral: true,
+      });
+    }
     return;
   }
 
@@ -566,6 +628,20 @@ bot.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isButton() && interaction.customId === "resolveThread") {
+    if (
+      !(
+        interaction.channel?.isThread() &&
+        interaction.channel.ownerId === interaction.user.id
+      ) &&
+      !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
+    ) {
+      await interaction.reply({
+        content:
+          "Only the person who posted this or a moderator can change whether it's resolved.",
+        ephemeral: true,
+      });
+      return;
+    }
     await interaction.deferUpdate();
     let [button, revertButton] = [
       {
