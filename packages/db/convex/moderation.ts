@@ -13,6 +13,7 @@ import {
   CLASSIFIED_VIOLATIONS,
   MOD_TIMEOUT_MINUTES,
   teamPingMinutes,
+  teamPingTimesOut,
   THRESHOLD_DEFAULTS,
   ThresholdName,
   VIOLATION_TIMEOUT_MINUTES,
@@ -280,13 +281,9 @@ export const applyPolicy = internalMutation({
       await remind(ctx, messageId, "convex_self_promo", confidence);
       return null;
     }
-    if (
-      teamPing &&
-      teamPing.timeout >= min.team_ping &&
-      teamPing.goodReason < min.team_ping
-    ) {
-      await timeoutTeamPing(ctx, messageId, teamPing);
-    }
+    const pingTimedOut =
+      !!teamPing && teamPingTimesOut(teamPing, min.team_ping);
+    if (pingTimedOut) await timeoutTeamPing(ctx, messageId, teamPing!);
     if (!(category === "harassment" && confidence >= min.harassment))
       return null;
 
@@ -316,13 +313,15 @@ export const applyPolicy = internalMutation({
       KICK_WINDOW_MS,
     );
     await record(ctx, { ...base, action: "delete", reason });
-    await record(ctx, {
-      ...base,
-      auto: false,
-      action: "timeout",
-      durationMinutes: PROPOSED_TIMEOUT_MINUTES,
-      reason,
-    });
+    if (!pingTimedOut) {
+      await record(ctx, {
+        ...base,
+        auto: false,
+        action: "timeout",
+        durationMinutes: PROPOSED_TIMEOUT_MINUTES,
+        reason,
+      });
+    }
     if (flaggedToday + 1 >= KICK_PROPOSAL_COUNT) {
       await record(ctx, {
         ...base,

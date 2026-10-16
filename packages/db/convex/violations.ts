@@ -39,6 +39,12 @@ export const VIOLATION_TITLES: Record<string, string> = {
 export const teamPingMinutes = (aggressive: number, rude: number) =>
   Math.round(5 + 10 * Math.max(aggressive, rude));
 
+// Jev hesitates on "should they be timed out" even for abuse, so aggressive or rude alone is enough.
+export const teamPingTimesOut = (
+  s: { aggressive: number; rude: number; goodReason: number; timeout: number },
+  min: number,
+) => s.goodReason < min && Math.max(s.aggressive, s.rude, s.timeout) >= min;
+
 export const isTeamRole = (name: string) =>
   ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));
 
