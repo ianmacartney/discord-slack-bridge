@@ -263,7 +263,8 @@ export default defineSchema({
   messages: Messages.table
     .index("id", ["id"])
     .index("slackTs", ["slackTs"])
-    .index("threadId", ["threadId"]),
+    .index("threadId", ["threadId"])
+    .index("channelId_threadId", ["channelId", "threadId"]),
   threads: Threads.table
     .index("id", ["id"])
     .index("slackThreadTs", ["slackThreadTs"])

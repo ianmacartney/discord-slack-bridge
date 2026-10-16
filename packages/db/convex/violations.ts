@@ -12,6 +12,7 @@ export const THRESHOLD_DEFAULTS = {
   dm_solicitation: 0.8,
   convex_self_promo: 0.9,
   needs_help: 0.8,
+  team_ping: 0.8,
   tag: 0.5,
 };
 export type ThresholdName = keyof typeof THRESHOLD_DEFAULTS;
@@ -33,6 +34,20 @@ export const VIOLATION_TITLES: Record<string, string> = {
   mass_mention: "@everyone or @here used",
   discord_invite: "Invite to another Discord server",
 };
+
+// 5 minutes for a mild ping, up to 15 for an aggressive or rude one.
+export const teamPingMinutes = (aggressive: number, rude: number) =>
+  Math.round(5 + 10 * Math.max(aggressive, rude));
+
+// Jev hesitates on "should they be timed out" even for abuse, so aggressive or rude alone is enough.
+export const teamPingTimesOut = (
+  s: { aggressive: number; rude: number; goodReason: number; timeout: number },
+  min: number,
+) => s.goodReason < min && Math.max(s.aggressive, s.rude, s.timeout) >= min;
+
+export const SUPPORT_RULE =
+  "Support happens in the Convex dashboard (support tickets) or in the community-support forum. " +
+  "The Convex team never asks anyone to go to another server, open a ticket anywhere else, or get help in DMs.";
 
 export const isTeamRole = (name: string) =>
   ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));

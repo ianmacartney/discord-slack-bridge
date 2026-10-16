@@ -144,13 +144,16 @@ async function postAlertCard(
 }
 
 const REMINDER_SECONDS = 30;
-const REMINDERS: Record<string, (rules: string, selfPromo: string) => string> =
-  {
-    dm_solicitation: (rules) =>
-      `Per the ${rules}, please don't DM people, that might lead to a ban.`,
-    convex_self_promo: (_, selfPromo) =>
-      `Thanks for sharing! Convex projects go in ${selfPromo}, please post it there.`,
-  };
+const REMINDERS: Record<
+  string,
+  (rules: string, selfPromo: string, support: string) => string
+> = {
+  dm_solicitation: (rules, _, support) =>
+    `Per the ${rules}: support tickets go through the Convex dashboard or ${support}. ` +
+    "The Convex team never asks you to go to another server or get help in DMs.",
+  convex_self_promo: (_, selfPromo) =>
+    `Thanks for sharing! Convex projects go in ${selfPromo}, please post it there.`,
+};
 
 async function postReminder(
   ctx: ActionCtx,
@@ -161,10 +164,10 @@ async function postReminder(
   const text = REMINDERS[action.category ?? ""];
   if (!text || !action.auto || !("send" in channel)) return;
   try {
-    const { rulesChannelId, selfPromoChannelId } = await ctx.runQuery(
-      internal.guildSettings.reminderChannelsFor,
-      { guildId: guild.id },
-    );
+    const { rulesChannelId, selfPromoChannelId, supportForumId } =
+      await ctx.runQuery(internal.guildSettings.reminderChannelsFor, {
+        guildId: guild.id,
+      });
     const rules = rulesChannelId ?? guild.rulesChannelId;
     const sent = await channel.send({
       content: `<@${action.targetDiscordUserId}> ${text(
@@ -172,6 +175,7 @@ async function postReminder(
         selfPromoChannelId
           ? `<#${selfPromoChannelId}>`
           : "the self-promo channel",
+        supportForumId ? `<#${supportForumId}>` : "community-support",
       )}`,
       allowedMentions: { users: [action.targetDiscordUserId] },
     });

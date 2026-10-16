@@ -1,10 +1,20 @@
 import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
-import { decide } from "./decisions";
-import { CLASSIFIED_VIOLATIONS, THRESHOLD_DEFAULTS } from "./violations";
+import { decide, JevAnswer } from "./decisions";
+import {
+  CLASSIFIED_VIOLATIONS,
+  SUPPORT_RULE,
+  THRESHOLD_DEFAULTS,
+} from "./violations";
 
 const MAX_MESSAGE_CHARS = 4000;
+// 20 x 1000 + 4000 stays under the ~32KB where Jev switches to its slower long-context mode.
+const EARLIER_MESSAGES = 20;
+const MAX_EARLIER_CHARS = 1000;
+const ONLY_THE_MESSAGE =
+  " Judge `message` only; `earlierMessages` and `replyTo` are the conversation before it.";
 
 export const MESSAGE_CATEGORIES = {
   normal: "Ordinary conversation that needs no action.",
@@ -40,8 +50,37 @@ const BAN_QUESTION = {
 const DM_QUESTION = {
   type: "noul",
   instructions:
-    "Is this message telling someone to check their DMs, saying the author sent them a DM, " +
-    "or asking people to DM the author?",
+    `Server rule: ${SUPPORT_RULE} ` +
+    "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
+    "saying the author sent them a DM, offering help or asking people to DM, " +
+    '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
+    "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely." +
+    ONLY_THE_MESSAGE,
+} as const;
+
+// Only asked when the message tags the Convex team.
+const TEAM_PING_QUESTIONS = {
+  aggressive: {
+    type: "noul",
+    instructions: "Is this message aggressive?" + ONLY_THE_MESSAGE,
+  },
+  rude: {
+    type: "noul",
+    instructions: "Is this message rude?" + ONLY_THE_MESSAGE,
+  },
+  goodReason: {
+    type: "noul",
+    instructions:
+      "This message tags Convex team members. Is that a good reason to tag them, " +
+      "such as a reply in a conversation they are part of, an outage, or a security issue?" +
+      ONLY_THE_MESSAGE,
+  },
+  timeout: {
+    type: "noul",
+    instructions:
+      "This message tags Convex team members. Should the author be timed out for tagging them?" +
+      ONLY_THE_MESSAGE,
+  },
 } as const;
 
 const REMOVAL_CATEGORIES = Object.fromEntries(
@@ -60,20 +99,59 @@ const messageForClassification = v.object({
   threadName: v.optional(v.string()),
 });
 
+const earlierMessage = v.object({ author: v.string(), text: v.string() });
+
+const messageWithContext = v.object({
+  ...messageForClassification.fields,
+  earlierMessages: v.array(earlierMessage),
+  replyTo: v.optional(earlierMessage),
+  mentionedPeople: v.number(),
+});
+
 export const getMessageForClassification = internalQuery({
   args: { messageId: v.id("messages") },
-  returns: v.union(v.null(), messageForClassification),
+  returns: v.union(v.null(), messageWithContext),
   handler: async ({ db }, { messageId }) => {
     const message = await db.get("messages", messageId);
     if (!message || !message.cleanContent.trim()) return null;
-    const [author, thread] = await Promise.all([
-      db.get("users", message.authorId),
+    const [thread, earlier, replied] = await Promise.all([
       message.threadId ? db.get("threads", message.threadId) : null,
+      db
+        .query("messages")
+        .withIndex("channelId_threadId", (q) =>
+          q
+            .eq("channelId", message.channelId)
+            .eq("threadId", message.threadId)
+            .lt("_creationTime", message._creationTime),
+        )
+        .order("desc")
+        .take(EARLIER_MESSAGES),
+      message.reference?.messageId
+        ? db
+            .query("messages")
+            .withIndex("id", (q) => q.eq("id", message.reference!.messageId!))
+            .unique()
+        : null,
     ]);
+    const name = async (m: Doc<"messages">) => {
+      const user = await db.get("users", m.authorId);
+      return user?.displayName ?? user?.username ?? "unknown";
+    };
+    const brief = async (m: Doc<"messages">) => ({
+      author: await name(m),
+      text: m.cleanContent.slice(0, MAX_EARLIER_CHARS),
+    });
+    const kept = (m: Doc<"messages"> | null): m is Doc<"messages"> =>
+      !!m && !m.deleted && !!m.cleanContent.trim();
     return {
       text: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
-      author: author?.displayName ?? author?.username ?? "unknown",
+      author: await name(message),
       threadName: thread?.name,
+      earlierMessages: await Promise.all(
+        earlier.filter(kept).reverse().map(brief),
+      ),
+      replyTo: kept(replied) ? await brief(replied) : undefined,
+      mentionedPeople: new Set(message.content.match(/<@!?\d+>/g)).size,
     };
   },
 });
@@ -127,16 +205,18 @@ export const getMessageByDiscordId = internalQuery({
 });
 
 export const classifyMessage = internalAction({
-  args: { messageId: v.id("messages") },
+  args: { messageId: v.id("messages"), pingedTeam: v.optional(v.boolean()) },
   returns: v.union(v.null(), messageClassification),
   handler: async (
     ctx,
-    { messageId },
+    { messageId, pingedTeam },
   ): Promise<Infer<typeof messageClassification> | null> => {
-    const message: Infer<typeof messageForClassification> | null =
-      await ctx.runQuery(internal.classify.getMessageForClassification, {
+    const message: Infer<typeof messageWithContext> | null = await ctx.runQuery(
+      internal.classify.getMessageForClassification,
+      {
         messageId,
-      });
+      },
+    );
 
     if (!message) return null;
 
@@ -145,15 +225,21 @@ export const classifyMessage = internalAction({
         message: message.text,
         author: message.author,
         thread: message.threadName,
+        earlierMessages: message.earlierMessages,
+        replyTo: message.replyTo,
+        mentionedPeople: message.mentionedPeople,
       },
       {
         category: {
           type: "choice",
-          instructions: "Which category best describes this Discord message?",
+          instructions:
+            "Which category best describes this Discord message?" +
+            ONLY_THE_MESSAGE,
           criteria: MESSAGE_CATEGORIES,
         },
         ban: BAN_QUESTION,
         dm: DM_QUESTION,
+        ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
       },
     );
 
@@ -162,8 +248,20 @@ export const classifyMessage = internalAction({
       throw new Error("Jev returned an unexpected answer type");
     const banScore = answers.ban.type === "noul" ? answers.ban.noul : 0;
     const dmScore = answers.dm.type === "noul" ? answers.dm.noul : 0;
+    const noul = (key: keyof typeof TEAM_PING_QUESTIONS) => {
+      const a = (answers as Record<string, JevAnswer | undefined>)[key];
+      return a?.type === "noul" ? a.noul : 0;
+    };
+    const teamPing = pingedTeam
+      ? {
+          aggressive: noul("aggressive"),
+          rude: noul("rude"),
+          goodReason: noul("goodReason"),
+          timeout: noul("timeout"),
+        }
+      : undefined;
     console.log(
-      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore}, dm ${dmScore})`,
+      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore}, dm ${dmScore}${teamPing ? `, team ping ${JSON.stringify(teamPing)}` : ""})`,
     );
     await ctx.runMutation(internal.moderation.applyPolicy, {
       messageId,
@@ -171,6 +269,7 @@ export const classifyMessage = internalAction({
       confidence: answer.confidence,
       banScore,
       dmScore,
+      teamPing,
     });
     if (
       answer.choice === "needs_help" &&

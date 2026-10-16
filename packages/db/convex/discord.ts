@@ -13,7 +13,6 @@ import {
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
 import { inviteCodes } from "./violations";
-import { timeoutTeamPing } from "./moderation";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -178,14 +177,6 @@ export const receiveMessage = apiMutation({
       });
     }
 
-    if (!author.bot && pingedTeam) {
-      await timeoutTeamPing(ctx, {
-        targetDiscordUserId: author.id,
-        channelId: thread?.id ?? channel.id,
-        discordMessageId: message.id,
-      });
-    }
-
     const codes = inviteCodes(message.content);
     if (
       !author.bot &&
@@ -202,6 +193,7 @@ export const receiveMessage = apiMutation({
     if (!author.bot && (message.type === 0 || message.type === 19)) {
       await ctx.scheduler.runAfter(0, internal.classify.classifyMessage, {
         messageId,
+        pingedTeam,
       });
     }
 
