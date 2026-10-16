@@ -12,6 +12,7 @@ import { ModAlerts, moderationActionKind } from "./schema";
 import {
   CLASSIFIED_VIOLATIONS,
   MOD_TIMEOUT_MINUTES,
+  teamPingMinutes,
   THRESHOLD_DEFAULTS,
   ThresholdName,
   VIOLATION_TIMEOUT_MINUTES,
@@ -23,7 +24,6 @@ const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
 export const BAN_DELETE_DAYS = 7;
-const TEAM_PING_TIMEOUT_MINUTES = 60;
 const CHAT_TIMEOUT_MINUTES = VIOLATION_TIMEOUT_MINUTES;
 
 export const get = internalQuery({
@@ -227,11 +227,26 @@ export const applyPolicy = internalMutation({
     confidence: v.optional(v.number()),
     banScore: v.optional(v.number()),
     dmScore: v.optional(v.number()),
+    teamPing: v.optional(
+      v.object({
+        aggressive: v.number(),
+        rude: v.number(),
+        goodReason: v.number(),
+        timeout: v.number(),
+      }),
+    ),
   },
   returns: v.null(),
   handler: async (
     ctx,
-    { messageId, category, confidence = 0, banScore = 0, dmScore = 0 },
+    {
+      messageId,
+      category,
+      confidence = 0,
+      banScore = 0,
+      dmScore = 0,
+      teamPing,
+    },
   ) => {
     const min = THRESHOLD_DEFAULTS;
     if (
@@ -264,6 +279,13 @@ export const applyPolicy = internalMutation({
     ) {
       await remind(ctx, messageId, "convex_self_promo", confidence);
       return null;
+    }
+    if (
+      teamPing &&
+      teamPing.timeout >= min.team_ping &&
+      teamPing.goodReason < min.team_ping
+    ) {
+      await timeoutTeamPing(ctx, messageId, teamPing);
     }
     if (!(category === "harassment" && confidence >= min.harassment))
       return null;
@@ -344,20 +366,30 @@ export const banForInvite = internalMutation({
   },
 });
 
-export async function timeoutTeamPing(
+async function timeoutTeamPing(
   ctx: MutationCtx,
-  target: Pick<
-    NewAction,
-    "targetDiscordUserId" | "channelId" | "discordMessageId"
-  >,
+  messageId: Doc<"messages">["_id"],
+  scores: { aggressive: number; rude: number; timeout: number },
 ) {
+  const message = await ctx.db.get("messages", messageId);
+  if (!message) return;
+  const [author, channel, thread] = await Promise.all([
+    ctx.db.get("users", message.authorId),
+    ctx.db.get("channels", message.channelId),
+    message.threadId ? ctx.db.get("threads", message.threadId) : null,
+  ]);
+  if (!author || !channel || author.bot) return;
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
   await record(ctx, {
-    ...target,
     auto: true,
     action: "timeout",
     category: "team_ping",
-    durationMinutes: TEAM_PING_TIMEOUT_MINUTES,
-    reason: "Pinged the Convex team",
+    confidence: scores.timeout,
+    targetDiscordUserId: author.id,
+    channelId: thread?.id ?? channel.id,
+    discordMessageId: message.id,
+    durationMinutes: teamPingMinutes(scores.aggressive, scores.rude),
+    reason: `Pinged the Convex team without a good reason (Jev: timeout ${pct(scores.timeout)}, aggressive ${pct(scores.aggressive)}, rude ${pct(scores.rude)})`,
   });
 }
 

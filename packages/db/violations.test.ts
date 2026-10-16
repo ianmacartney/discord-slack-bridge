@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { inviteCodes, isTeamRole } from "./convex/violations.ts";
+import {
+  inviteCodes,
+  isTeamRole,
+  teamPingMinutes,
+} from "./convex/violations.ts";
 
 assert.deepEqual(inviteCodes("join https://discord.gg/abc123 now"), ["abc123"]);
 assert.deepEqual(
@@ -17,3 +21,6 @@ assert.ok(
 );
 assert.ok(isTeamRole("convex") && isTeamRole("Convex"));
 assert.ok(!isTeamRole("team") && !isTeamRole("convex-fan"));
+assert.equal(teamPingMinutes(0, 0), 5);
+assert.equal(teamPingMinutes(0.2, 1), 15);
+assert.equal(teamPingMinutes(0.5, 0.1), 10);

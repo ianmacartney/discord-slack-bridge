@@ -12,6 +12,7 @@ export const THRESHOLD_DEFAULTS = {
   dm_solicitation: 0.8,
   convex_self_promo: 0.9,
   needs_help: 0.8,
+  team_ping: 0.8,
   tag: 0.5,
 };
 export type ThresholdName = keyof typeof THRESHOLD_DEFAULTS;
@@ -33,6 +34,10 @@ export const VIOLATION_TITLES: Record<string, string> = {
   mass_mention: "@everyone or @here used",
   discord_invite: "Invite to another Discord server",
 };
+
+// 5 minutes for a mild ping, up to 15 for an aggressive or rude one.
+export const teamPingMinutes = (aggressive: number, rude: number) =>
+  Math.round(5 + 10 * Math.max(aggressive, rude));
 
 export const isTeamRole = (name: string) =>
   ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));
