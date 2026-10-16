@@ -45,6 +45,10 @@ export const teamPingTimesOut = (
   min: number,
 ) => s.goodReason < min && Math.max(s.aggressive, s.rude, s.timeout) >= min;
 
+export const SUPPORT_RULE =
+  "Support happens in the Convex dashboard (support tickets) or in the community-support forum. " +
+  "The Convex team never asks anyone to go to another server, open a ticket anywhere else, or get help in DMs.";
+
 export const isTeamRole = (name: string) =>
   ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));
 

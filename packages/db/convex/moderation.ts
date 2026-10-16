@@ -213,11 +213,13 @@ async function remind(
     });
     return;
   }
+  const reason = `Sent people to DMs, another server or an unofficial ticket ${jev}`;
+  await record(ctx, { ...base, action: "delete", reason });
   await record(ctx, {
     ...base,
     action: "timeout",
     durationMinutes: VIOLATION_TIMEOUT_MINUTES,
-    reason: `Asked people to DM, or said they sent someone a DM ${jev}`,
+    reason,
   });
 }
 

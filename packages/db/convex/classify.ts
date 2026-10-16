@@ -3,7 +3,11 @@ import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
 import { decide, JevAnswer } from "./decisions";
-import { CLASSIFIED_VIOLATIONS, THRESHOLD_DEFAULTS } from "./violations";
+import {
+  CLASSIFIED_VIOLATIONS,
+  SUPPORT_RULE,
+  THRESHOLD_DEFAULTS,
+} from "./violations";
 
 const MAX_MESSAGE_CHARS = 4000;
 // 20 x 1000 + 4000 stays under the ~32KB where Jev switches to its slower long-context mode.
@@ -46,8 +50,11 @@ const BAN_QUESTION = {
 const DM_QUESTION = {
   type: "noul",
   instructions:
-    "Is this message telling someone to check their DMs, saying the author sent them a DM, " +
-    "or asking people to DM the author?" +
+    `Server rule: ${SUPPORT_RULE} ` +
+    "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
+    "saying the author sent them a DM, offering help or asking people to DM, " +
+    '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
+    "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely." +
     ONLY_THE_MESSAGE,
 } as const;
 
@@ -98,6 +105,7 @@ const messageWithContext = v.object({
   ...messageForClassification.fields,
   earlierMessages: v.array(earlierMessage),
   replyTo: v.optional(earlierMessage),
+  mentionedPeople: v.number(),
 });
 
 export const getMessageForClassification = internalQuery({
@@ -143,6 +151,7 @@ export const getMessageForClassification = internalQuery({
         earlier.filter(kept).reverse().map(brief),
       ),
       replyTo: kept(replied) ? await brief(replied) : undefined,
+      mentionedPeople: new Set(message.content.match(/<@!?\d+>/g)).size,
     };
   },
 });
@@ -218,6 +227,7 @@ export const classifyMessage = internalAction({
         thread: message.threadName,
         earlierMessages: message.earlierMessages,
         replyTo: message.replyTo,
+        mentionedPeople: message.mentionedPeople,
       },
       {
         category: {
