@@ -230,6 +230,7 @@ export const applyPolicy = internalMutation({
     confidence: v.optional(v.number()),
     banScore: v.optional(v.number()),
     dmScore: v.optional(v.number()),
+    scamScore: v.optional(v.number()),
     teamPing: v.optional(
       v.object({
         aggressive: v.number(),
@@ -248,10 +249,16 @@ export const applyPolicy = internalMutation({
       confidence = 0,
       banScore = 0,
       dmScore = 0,
+      scamScore = 0,
       teamPing,
     },
   ) => {
     const min = THRESHOLD_DEFAULTS;
+    // Jev often splits a scam between spam and fraud; together they count as spam.
+    if (scamScore >= min.spam) {
+      category = "spam";
+      confidence = scamScore;
+    }
     if (
       (CLASSIFIED_VIOLATIONS as readonly string[]).includes(category) &&
       confidence >= min[category as ThresholdName]

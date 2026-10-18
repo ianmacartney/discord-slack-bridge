@@ -22,7 +22,8 @@ export const MESSAGE_CATEGORIES = {
     "Someone is asking for help or reporting a problem they want solved.",
   spam:
     "Unsolicited promotion, scams, repeated junk, bot-like repetition, self-promotion unrelated to Convex, " +
-    "phishing or scam links, or links with no relevance to the conversation.",
+    "phishing or scam links, or links with no relevance to the conversation. " +
+    "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp.",
   convex_self_promo:
     "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",
   nsfw_or_violent:
@@ -43,7 +44,8 @@ const BAN_QUESTION = {
   type: "noul",
   instructions:
     "Is this account clearly here only to spam, scam, or abuse people, with nothing worth keeping? " +
-    "Crypto or giveaway scams, phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
+    'Crypto or giveaway scams, get-rich-quick or profit-share offers ("make $100K, message me", Telegram or WhatsApp handles), ' +
+    "phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
     "A real person being rude, off-topic or asking for work is no.",
 } as const;
 
@@ -248,6 +250,9 @@ export const classifyMessage = internalAction({
       throw new Error("Jev returned an unexpected answer type");
     const banScore = answers.ban.type === "noul" ? answers.ban.noul : 0;
     const dmScore = answers.dm.type === "noul" ? answers.dm.noul : 0;
+    const scamScore =
+      (answer.probabilities?.spam ?? 0) +
+      (answer.probabilities?.fraud_or_illegal ?? 0);
     const noul = (key: keyof typeof TEAM_PING_QUESTIONS) => {
       const a = (answers as Record<string, JevAnswer | undefined>)[key];
       return a?.type === "noul" ? a.noul : 0;
@@ -261,7 +266,7 @@ export const classifyMessage = internalAction({
         }
       : undefined;
     console.log(
-      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, ban ${banScore}, dm ${dmScore}${teamPing ? `, team ping ${JSON.stringify(teamPing)}` : ""})`,
+      `classified "${message.text.slice(0, 60)}" by ${message.author}: ${answer.choice} (confidence ${answer.confidence}, scam ${scamScore.toFixed(2)}, ban ${banScore}, dm ${dmScore}${teamPing ? `, team ping ${JSON.stringify(teamPing)}` : ""})`,
     );
     await ctx.runMutation(internal.moderation.applyPolicy, {
       messageId,
@@ -269,6 +274,7 @@ export const classifyMessage = internalAction({
       confidence: answer.confidence,
       banScore,
       dmScore,
+      scamScore,
       teamPing,
     });
     if (
