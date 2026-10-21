@@ -23,7 +23,7 @@
     "algoliasearch": "^4.17.0",
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.124",
-    "discord.js": "^14.9.0",
+    "discord.js": "^14.27.0",
     "lodash": "^4.17.21"
   },
   "devDependencies": {

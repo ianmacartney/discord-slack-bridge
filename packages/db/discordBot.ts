@@ -169,6 +169,16 @@ bot.on("messageDelete", async (msg) => {
 bot.on("threadCreate", async (thread) => {
   console.log(`new thread ${thread.id} "${thread.name}" in ${thread.parentId}`);
   if (autoReplyChannelId && thread.parentId === autoReplyChannelId) {
+    // The bot opens a post to forward someone's message into it. Listen before anything else awaits, so the welcome
+    // comes after the forwarded message.
+    const forwarded =
+      thread.ownerId === bot.user?.id
+        ? thread.awaitMessages({
+            filter: (m) => m.messageSnapshots.size > 0,
+            max: 1,
+            time: 15_000,
+          })
+        : null;
     try {
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
@@ -189,6 +199,7 @@ bot.on("threadCreate", async (thread) => {
           .setStyle(ButtonStyle.Success),
       );
 
+      await forwarded;
       await thread.send({
         embeds: [embed],
         components: [actionRow],

@@ -2,7 +2,7 @@
 // https://docs.convex.dev/ai-gateway -- POST /alpha/decisions (alpha, format may change).
 import { getServiceToken } from "convex/server";
 
-const GATEWAY_URL = "https://ai-gateway.convex.dev";
+export const GATEWAY_URL = "https://ai-gateway.convex.dev";
 export const JEV_MODEL = "typesafe/jev-1.14";
 
 export type JevQuestion =
