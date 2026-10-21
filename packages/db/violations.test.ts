@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import {
   inviteCodes,
+  isRaidBait,
   isTeamRole,
+  postFingerprint,
   teamPingMinutes,
   teamPingTimesOut,
 } from "./convex/violations.ts";
@@ -36,3 +38,26 @@ const polite = {
 assert.ok(teamPingTimesOut(abuse, 0.8));
 assert.ok(!teamPingTimesOut(polite, 0.8));
 assert.ok(!teamPingTimesOut({ ...abuse, goodReason: 0.9 }, 0.8));
+
+const images = (...sizes: number[]) => sizes.map((size) => ({ size }));
+assert.equal(
+  postFingerprint("", images(10, 20, 30)),
+  postFingerprint("", images(30, 10, 20)),
+);
+assert.notEqual(
+  postFingerprint("", images(10, 20)),
+  postFingerprint("", images(10, 21)),
+);
+assert.equal(postFingerprint("hi"), null);
+assert.equal(postFingerprint("scamlink.com"), "scamlink.com|");
+assert.equal(postFingerprint("thanks!!"), null);
+assert.equal(postFingerprint("hi", images(5)), "hi|5");
+assert.equal(
+  postFingerprint("Free  MrBeast giveaway, claim now!"),
+  postFingerprint("free mrbeast giveaway, claim now!"),
+);
+assert.ok(isRaidBait("", images(1)));
+assert.ok(isRaidBait("One key, all models | luoluocoder.com"));
+assert.ok(isRaidBait("claim at https://example.org/x"));
+assert.ok(!isRaidBait("my query returns undefined", images(1)));
+assert.ok(!isRaidBait("my query returns undefined"));

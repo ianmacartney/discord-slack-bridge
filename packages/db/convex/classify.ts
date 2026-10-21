@@ -13,6 +13,7 @@ const MAX_MESSAGE_CHARS = 4000;
 // 20 x 1000 + 4000 stays under the ~32KB where Jev switches to its slower long-context mode.
 const EARLIER_MESSAGES = 20;
 const MAX_EARLIER_CHARS = 1000;
+const AUTHOR_HISTORY = 5;
 const ONLY_THE_MESSAGE =
   " Judge `message` only; `earlierMessages` and `replyTo` are the conversation before it.";
 
@@ -23,7 +24,8 @@ export const MESSAGE_CATEGORIES = {
   spam:
     "Unsolicited promotion, scams, repeated junk, bot-like repetition, self-promotion unrelated to Convex, " +
     "phishing or scam links, or links with no relevance to the conversation. " +
-    "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp.",
+    "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp, " +
+    'and selling or reselling AI model access or API keys, such as "one key, all models" or "GPT + Claude at 90% off".',
   convex_self_promo:
     "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",
   nsfw_or_violent:
@@ -45,7 +47,7 @@ const BAN_QUESTION = {
   instructions:
     "Is this account clearly here only to spam, scam, or abuse people, with nothing worth keeping? " +
     'Crypto or giveaway scams, get-rich-quick or profit-share offers ("make $100K, message me", Telegram or WhatsApp handles), ' +
-    "phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
+    "selling cheap AI model access or API keys, phishing links, mass-posted ads, recruiting for fraud and raw abuse are yes. " +
     "A real person being rude, off-topic or asking for work is no.",
 } as const;
 
@@ -58,6 +60,21 @@ const DM_QUESTION = {
     '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
     "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely." +
     ONLY_THE_MESSAGE,
+} as const;
+
+const SUPPORT_PUNISHMENT = {
+  type: "choice",
+  instructions:
+    `Server rule: ${SUPPORT_RULE} ` +
+    "`message` breaks that rule. Decide what happens to its author, from `firstMessage` (whether this is the first " +
+    "message they have posted here), `authorHistory` (their messages before this one, oldest first), `joinedServer` " +
+    "and `accountCreated`. Be strict: when torn between two options, choose the harsher one.",
+  criteria: {
+    ban: "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away.",
+    kick: "They have posted before, but nothing that shows a genuine Convex user.",
+    timeout:
+      "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
+  },
 } as const;
 
 // Only asked when the message tags the Convex team.
@@ -203,6 +220,130 @@ export const getMessageByDiscordId = internalQuery({
       text: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
       author: author?.displayName ?? author?.username ?? "unknown",
     };
+  },
+});
+
+const supportBreak = v.object({
+  message: v.string(),
+  firstMessage: v.boolean(),
+  authorHistory: v.array(v.string()),
+  joinedServer: v.union(v.null(), v.string()),
+  accountCreated: v.string(),
+});
+
+export const getSupportBreak = internalQuery({
+  args: { messageId: v.id("messages") },
+  returns: v.union(v.null(), supportBreak),
+  handler: async ({ db }, { messageId }) => {
+    const message = await db.get("messages", messageId);
+    if (!message) return null;
+    const [author, earlier] = await Promise.all([
+      db.get("users", message.authorId),
+      db
+        .query("messages")
+        .withIndex("by_authorId", (q) =>
+          q
+            .eq("authorId", message.authorId)
+            .lt("_creationTime", message._creationTime),
+        )
+        .order("desc")
+        .take(AUTHOR_HISTORY),
+    ]);
+    if (!author) return null;
+    return {
+      message: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
+      firstMessage: earlier.length === 0,
+      authorHistory: earlier
+        .reverse()
+        .map((m) => m.cleanContent.slice(0, MAX_EARLIER_CHARS)),
+      joinedServer: author.joinedTimestamp
+        ? new Date(author.joinedTimestamp).toISOString()
+        : null,
+      accountCreated: new Date(author.createdTimestamp).toISOString(),
+    };
+  },
+});
+
+const RAID_QUESTION = {
+  type: "noul",
+  instructions:
+    "Is this a spam raid: `posts` pushed into several channels, or fired off fast, to reach as many people as possible? " +
+    "Yes includes the same images with no text copied into several channels within seconds (how scam images such as " +
+    "fake MrBeast or crypto giveaways are spread), crypto, ads and links to unrelated sites. A real member chatting " +
+    "quickly, or asking the same question with text explaining it in two places, is no. Image-only posts show only " +
+    "their file names. `authorHistory` is what they posted before, oldest first: a history with nothing about Convex " +
+    "makes a raid more likely.",
+} as const;
+
+export const raidState = v.object({
+  trigger: v.string(),
+  posts: v.array(
+    v.object({
+      channel: v.string(),
+      text: v.string(),
+      attachments: v.array(v.string()),
+    }),
+  ),
+  identical: v.boolean(),
+  spreadSeconds: v.number(),
+  firstMessage: v.boolean(),
+  authorHistory: v.array(v.string()),
+  joinedServer: v.union(v.null(), v.string()),
+  accountCreated: v.string(),
+});
+
+/** One Jev call per raid, from behavior only: is it spam? */
+export const judgeRaid = internalAction({
+  args: {
+    raidId: v.id("raids"),
+    messageId: v.id("messages"),
+    state: raidState,
+  },
+  returns: v.null(),
+  handler: async (ctx, { raidId, messageId, state }): Promise<null> => {
+    const { answers } = await decide(state, { spam: RAID_QUESTION });
+    const spamScore = answers.spam.type === "noul" ? answers.spam.noul : 0;
+    const channels = new Set(state.posts.map((p) => p.channel)).size;
+    console.log(
+      `raid (${state.trigger}): ${state.posts.length} messages in ${channels} channels over ${state.spreadSeconds}s, ` +
+        `spam ${spamScore.toFixed(2)} → ${spamScore >= THRESHOLD_DEFAULTS.raid ? "ban" : "ignore"}`,
+    );
+    await ctx.runMutation(internal.moderation.settleRaid, {
+      raidId,
+      messageId,
+      spamScore,
+    });
+    return null;
+  },
+});
+
+/** Someone broke the support rule: Jev picks ban, kick or a one-day timeout from their history. */
+export const judgeSupportBreak = internalAction({
+  args: { messageId: v.id("messages"), dmScore: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { messageId, dmScore }): Promise<null> => {
+    const state: Infer<typeof supportBreak> | null = await ctx.runQuery(
+      internal.classify.getSupportBreak,
+      { messageId },
+    );
+    if (!state) return null;
+    const { answers } = await decide(state, { punishment: SUPPORT_PUNISHMENT });
+    const answer = answers.punishment;
+    const punishment =
+      answer.type === "choice" &&
+      (answer.choice === "ban" || answer.choice === "kick")
+        ? answer.choice
+        : "timeout";
+    console.log(
+      `support rule broken (first message ${state.firstMessage}, ${state.authorHistory.length} earlier): ${punishment} (confidence ${answer.type === "choice" ? answer.confidence : "n/a"})`,
+    );
+    await ctx.runMutation(internal.moderation.punishSupportBreak, {
+      messageId,
+      dmScore,
+      punishment,
+      confidence: answer.type === "choice" ? answer.confidence : undefined,
+    });
+    return null;
   },
 });
 

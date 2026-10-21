@@ -53,6 +53,15 @@ export const DiscordMessage = {
   system: v.boolean(),
   type: v.number(),
   json: v.optional(v.any()),
+  attachments: v.optional(
+    v.array(
+      v.object({
+        name: v.string(),
+        size: v.number(),
+        contentType: nullable(v.string()),
+      }),
+    ),
+  ),
 };
 export type DiscordMessage = ObjectType<typeof DiscordMessage>;
 export const Messages = Table("messages", {
@@ -241,7 +250,28 @@ export const HelpForwards = Table("helpForwards", {
   resolved: v.optional(v.boolean()),
 });
 
+export const Raids = Table("raids", {
+  authorId: v.id("users"),
+  trigger: v.union(
+    v.literal("rate_limit"),
+    v.literal("cross_post"),
+    v.literal("repeat"),
+  ),
+  fingerprint: v.optional(v.string()),
+  channelIds: v.array(v.string()),
+  messageIds: v.array(v.id("messages")),
+  spreadSeconds: v.number(),
+  spamScore: v.optional(v.number()),
+  fastPath: v.optional(v.boolean()),
+  decision: v.union(
+    v.literal("pending"),
+    v.literal("banned"),
+    v.literal("ignored"),
+  ),
+});
+
 export default defineSchema({
+  raids: Raids.table.index("by_authorId", ["authorId"]),
   helpForwards: HelpForwards.table
     .index("by_discordMessageId", ["discordMessageId"])
     .index("by_discordThreadId", ["discordThreadId"]),
@@ -264,7 +294,8 @@ export default defineSchema({
     .index("id", ["id"])
     .index("slackTs", ["slackTs"])
     .index("threadId", ["threadId"])
-    .index("channelId_threadId", ["channelId", "threadId"]),
+    .index("channelId_threadId", ["channelId", "threadId"])
+    .index("by_authorId", ["authorId"]),
   threads: Threads.table
     .index("id", ["id"])
     .index("slackThreadTs", ["slackThreadTs"])
