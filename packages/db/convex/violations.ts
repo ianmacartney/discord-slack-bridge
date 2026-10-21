@@ -47,7 +47,8 @@ export const teamPingTimesOut = (
 
 export const SUPPORT_RULE =
   "Support happens in the Convex dashboard (support tickets) or in the community-support forum. " +
-  "The Convex team never asks anyone to go to another server, open a ticket anywhere else, or get help in DMs.";
+  "The Convex team never asks anyone to go to another server, open a ticket anywhere else, get help in DMs, " +
+  "pay for support, or install extra software, and never tries to mislead anyone.";
 
 export const isTeamRole = (name: string) =>
   ["convex", "convexteam"].includes(name.toLowerCase().replace(/[^a-z]/g, ""));

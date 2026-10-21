@@ -3,15 +3,18 @@
 import { v } from "convex/values";
 import {
   ActionRowBuilder,
+  APIChannel,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   EmbedBuilder,
+  Routes,
 } from "discord.js";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { CARD_COLOR } from "./brandColors";
-import { discordClient } from "./discord_node";
+import { discordRest, sendMessage } from "./discord_node";
 import { MAX_APPLIED_TAGS } from "./tagDefinitions";
 
 /**
@@ -30,23 +33,26 @@ export const applyThreadTags = internalAction({
     _ctx,
     { discordThreadId, addTagIds, removeTagIds, reason },
   ) => {
-    const bot = await discordClient();
+    const rest = discordRest();
     try {
-      const thread = await bot.channels.fetch(discordThreadId);
-      if (!thread || !thread.isThread()) return null;
-      const kept = thread.appliedTags.filter(
+      const thread = (await rest.get(
+        Routes.channel(discordThreadId),
+      )) as APIChannel;
+      if (thread.type !== ChannelType.PublicThread) return null;
+      const kept = (thread.applied_tags ?? []).filter(
         (id) => !removeTagIds.includes(id),
       );
       const merged = [...new Set([...kept, ...addTagIds])].slice(
         0,
         MAX_APPLIED_TAGS,
       );
-      await thread.setAppliedTags(merged, reason);
+      await rest.patch(Routes.channel(discordThreadId), {
+        body: { applied_tags: merged },
+        reason,
+      });
     } catch (error) {
       // Tagging is a convenience: log it, never fail the pipeline.
       console.error("applying forum tags failed", error);
-    } finally {
-      await bot.destroy();
     }
     return null;
   },
@@ -120,10 +126,7 @@ export const postTagNote = internalAction({
         iconURL: thread.ownerAvatarUrl ?? undefined,
       });
     }
-    const bot = await discordClient();
     try {
-      const channel = await bot.channels.fetch(modChannelId);
-      if (!channel || !("send" in channel)) return null;
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId(`tag:undo:${decision._id}`)
@@ -134,10 +137,10 @@ export const postTagNote = internalAction({
           .setLabel("Edit")
           .setStyle(ButtonStyle.Primary),
       );
-      const sent = await channel.send({
-        embeds: [embed],
-        components: [row],
-        allowedMentions: { parse: [] },
+      const sent = await sendMessage(discordRest(), modChannelId, {
+        embeds: [embed.toJSON()],
+        components: [row.toJSON()],
+        allowed_mentions: { parse: [] },
       });
       await ctx.runMutation(internal.tags.setNoteMessage, {
         decisionId,
@@ -146,8 +149,6 @@ export const postTagNote = internalAction({
     } catch (error) {
       // The note is optional: tagging already happened.
       console.error("posting the tag note failed", error);
-    } finally {
-      await bot.destroy();
     }
     return null;
   },

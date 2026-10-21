@@ -2,12 +2,24 @@
 
 import { getServiceToken } from "convex/server";
 import { Infer, v } from "convex/values";
-import { ChannelFlags, ChannelType, EmbedBuilder } from "discord.js";
+import {
+  APIChannel,
+  APIMessage,
+  APIThreadChannel,
+  calculateUserDefaultAvatarIndex,
+  ChannelFlags,
+  ChannelType,
+  DiscordAPIError,
+  EmbedBuilder,
+  MessageReferenceType,
+  RESTJSONErrorCodes,
+  Routes,
+} from "discord.js";
 import { internal } from "./_generated/api";
 import { ActionCtx, internalAction } from "./_generated/server";
 import { CARD_COLOR } from "./brandColors";
 import { decide, GATEWAY_URL } from "./decisions";
-import { discordClient } from "./discord_node";
+import { discordRest, sendMessage } from "./discord_node";
 import { forwardContext } from "./followup";
 import { limitPerPerson } from "./limits";
 import { chooseTags } from "./tags";
@@ -24,7 +36,7 @@ const MAX_EMBED_DESCRIPTION = 4096;
 const TITLE_MODEL = "scaledown/summarize";
 
 /** A small model writes the post's title. Falls back to the message's first line if the call fails. */
-async function titleFor(text: string) {
+const titleFor = async (text: string) => {
   const firstLine = text.split("\n")[0].trim();
   const fallback =
     firstLine.length > MAX_TITLE
@@ -68,7 +80,7 @@ async function titleFor(text: string) {
     console.error("titling a forwarded post failed", error);
     return fallback;
   }
-}
+};
 
 /**
  * A needs_help message in the /forwardfrom channel: if Jev thinks it's a detailed problem worth a thread, the bot reacts
@@ -138,24 +150,40 @@ async function openSupportPost(
   context: Infer<typeof forwardContext>,
   forwardedBy: string | null,
 ) {
-  const bot = await discordClient();
+  const rest = discordRest();
   try {
-    const source = await bot.channels.fetch(context.sourceChannelId);
-    const forum = await bot.channels.fetch(context.forumId);
-    if (!source || !("messages" in source)) return null;
-    if (!forum || forum.type !== ChannelType.GuildForum) return null;
-    const original = await source.messages.fetch(context.discordMessageId);
+    const forum = (await rest.get(
+      Routes.channel(context.forumId),
+    )) as APIChannel;
+    if (forum.type !== ChannelType.GuildForum) return null;
+    const original = (await rest
+      .get(
+        Routes.channelMessage(
+          context.sourceChannelId,
+          context.discordMessageId,
+        ),
+      )
+      .catch((error) => {
+        if (
+          error instanceof DiscordAPIError &&
+          error.code === RESTJSONErrorCodes.UnknownMessage
+        )
+          return null;
+        throw error;
+      })) as APIMessage | null;
+    if (!original) return null;
+    const url = `https://discord.com/channels/${context.guildId}/${context.sourceChannelId}/${context.discordMessageId}`;
 
     const title = await titleFor(context.text);
     // Discord can't start a forum post with a forwarded message, so the post opens with the message quoted (the forum's
     // preview, and what search reads) and the original is forwarded right under it, whole and with its attachments.
-    const header = `<@${context.authorDiscordId}> asked in <#${context.sourceChannelId}> · [original message](${original.url})`;
+    const header = `<@${context.authorDiscordId}> asked in <#${context.sourceChannelId}> · [original message](${url})`;
     const room = MAX_MESSAGE - header.length - 6;
     const quoted =
       context.text.length > room
         ? `${context.text.slice(0, room)}…`
         : context.text;
-    const forumTags = forum.availableTags.map((t) => ({
+    const forumTags = forum.available_tags.map((t) => ({
       id: t.id,
       name: t.name,
     }));
@@ -168,18 +196,21 @@ async function openSupportPost(
       console.error("choosing tags for a forwarded post failed", error);
       return { tagIds: [] as string[] };
     });
-    if (tagIds.length === 0 && forum.flags.has(ChannelFlags.RequireTag)) {
+    const requiresTag = ((forum.flags ?? 0) & ChannelFlags.RequireTag) !== 0;
+    if (tagIds.length === 0 && requiresTag) {
       const fallback = forumTags.find(isTopicTag);
       tagIds = fallback ? [fallback.id] : [];
     }
-    const thread = await forum.threads.create({
-      name: title,
-      appliedTags: tagIds,
-      message: {
-        content: `${header}\n>>> ${quoted}`,
-        allowedMentions: { users: [context.authorDiscordId] },
+    const thread = (await rest.post(Routes.threads(context.forumId), {
+      body: {
+        name: title,
+        applied_tags: tagIds,
+        message: {
+          content: `${header}\n>>> ${quoted}`,
+          allowed_mentions: { users: [context.authorDiscordId] },
+        },
       },
-    });
+    })) as APIThreadChannel;
     // Recorded before anything else can fail, so a retried !forward can't open a second post.
     await ctx.runMutation(internal.followup.recordForward, {
       discordMessageId: context.discordMessageId,
@@ -187,12 +218,26 @@ async function openSupportPost(
       discordThreadId: thread.id,
       authorDiscordId: context.authorDiscordId,
     });
-    await original.forward(thread);
-    await original.react("👀");
+    await sendMessage(rest, thread.id, {
+      message_reference: {
+        type: MessageReferenceType.Forward,
+        message_id: context.discordMessageId,
+        channel_id: context.sourceChannelId,
+        guild_id: context.guildId,
+      },
+    });
+    await rest.put(
+      Routes.channelMessageOwnReaction(
+        context.sourceChannelId,
+        context.discordMessageId,
+        encodeURIComponent("👀"),
+      ),
+    );
     // Point them at the new post without pinging them again.
-    await original.reply({
+    await sendMessage(rest, context.sourceChannelId, {
       content: `Forwarding the message to <#${thread.id}>`,
-      allowedMentions: { repliedUser: false },
+      message_reference: { message_id: context.discordMessageId },
+      allowed_mentions: { replied_user: false },
     });
 
     // Let moderators know a message was turned into a post.
@@ -200,16 +245,20 @@ async function openSupportPost(
       internal.guildSettings.modChannelFor,
       { guildId: context.guildId },
     );
-    const mods = modChannelId ? await bot.channels.fetch(modChannelId) : null;
-    if (mods && "send" in mods) {
+    if (modChannelId) {
+      const { author } = original;
       const excerpt = context.text.slice(0, MAX_EMBED_DESCRIPTION - 5);
       const embed = new EmbedBuilder()
         .setColor(CARD_COLOR.info)
         .setTitle("Message forwarded to support")
-        .setURL(original.url)
+        .setURL(url)
         .setAuthor({
-          name: original.author.displayName ?? original.author.username,
-          iconURL: original.author.displayAvatarURL(),
+          name: author.global_name ?? author.username,
+          iconURL: author.avatar
+            ? rest.cdn.avatar(author.id, author.avatar)
+            : rest.cdn.defaultAvatar(
+                calculateUserDefaultAvatarIndex(author.id),
+              ),
         })
         .setDescription(
           `>>> ${excerpt}${context.text.length > excerpt.length ? "…" : ""}`,
@@ -233,12 +282,13 @@ async function openSupportPost(
           },
         )
         .setTimestamp();
-      await mods.send({ embeds: [embed], allowedMentions: { parse: [] } });
+      await sendMessage(rest, modChannelId, {
+        embeds: [embed.toJSON()],
+        allowed_mentions: { parse: [] },
+      });
     }
   } catch (error) {
     console.error("forwarding to the support forum failed", error);
-  } finally {
-    await bot.destroy();
   }
 }
 
@@ -247,16 +297,16 @@ export const reactResolved = internalAction({
   args: { sourceChannelId: v.string(), discordMessageId: v.string() },
   returns: v.null(),
   handler: async (_ctx, { sourceChannelId, discordMessageId }) => {
-    const bot = await discordClient();
     try {
-      const source = await bot.channels.fetch(sourceChannelId);
-      if (!source || !("messages" in source)) return null;
-      const original = await source.messages.fetch(discordMessageId);
-      await original.react("👍");
+      await discordRest().put(
+        Routes.channelMessageOwnReaction(
+          sourceChannelId,
+          discordMessageId,
+          encodeURIComponent("👍"),
+        ),
+      );
     } catch (error) {
       console.error("reacting to a resolved forward failed", error);
-    } finally {
-      await bot.destroy();
     }
     return null;
   },
