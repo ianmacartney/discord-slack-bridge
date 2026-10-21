@@ -33,66 +33,72 @@ export const sendMessage = (
 ) =>
   rest.post(Routes.channelMessages(channelId), { body }) as Promise<APIMessage>;
 
+// Actions only send things through the REST API, so by default they ask for no privileged intents.
+// The long-running bot (discordBot.ts) is what listens with Message Content and Server Members.
+export const discordClient = async (
+  intents: GatewayIntentBits[] = [GatewayIntentBits.Guilds],
+) => {
+  const bot = new Client({ intents });
+  const token = env.DISCORD_TOKEN;
+  if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
+  await bot.login(token);
+  return bot;
+};
+
 export const backfillDiscordChannel = internalAction({
   args: { discordId: v.string() },
   handler: async ({ runMutation }, { discordId }) => {
-    const bot = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.MessageContent,
-      ],
-    });
-    await bot.login(env.DISCORD_TOKEN);
-    try {
-      const channel = await bot.channels.fetch(discordId);
-      if (!channel) {
-        throw new Error(`Channel ${discordId} not found`);
+    // The backfill loads the full member list, which needs Server Members.
+    const bot = await discordClient([
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.MessageContent,
+    ]);
+    const channel = await bot.channels.fetch(discordId);
+    if (!channel) {
+      throw new Error(`Channel ${discordId} not found`);
+    }
+    if (
+      channel.type !== ChannelType.GuildForum &&
+      channel.type !== ChannelType.GuildText
+    ) {
+      throw new Error("Only supporting backfilling forums for now");
+    }
+    await channel.guild.members.fetch();
+    const channelId = (await runMutation(internal.discord.addUniqueDoc, {
+      table: "channels",
+      doc: serializeChannel(channel),
+    })) as Id<"channels">;
+    const { threads } = await channel.threads.fetchActive();
+    for (const [, thread] of threads.entries()) {
+      if (thread.id !== discordId && thread.parentId !== discordId) {
+        continue;
       }
-      if (
-        channel.type !== ChannelType.GuildForum &&
-        channel.type !== ChannelType.GuildText
-      ) {
-        throw new Error("Only supporting backfilling forums for now");
-      }
-      await channel.guild.members.fetch();
-      const channelId = (await runMutation(internal.discord.addUniqueDoc, {
-        table: "channels",
-        doc: serializeChannel(channel),
-      })) as Id<"channels">;
-      const { threads } = await channel.threads.fetchActive();
-      for (const [, thread] of threads.entries()) {
-        if (thread.id !== discordId && thread.parentId !== discordId) {
-          continue;
+      const threadId = (await runMutation(internal.discord.addUniqueDoc, {
+        table: "threads",
+        doc: {
+          ...serializeThread(thread),
+          channelId,
+        },
+      })) as Id<"threads">;
+      const messages = await thread.messages.fetch();
+      const authorsAndMessagesToAdd: [DiscordUser, DiscordMessage][] = [];
+      for (const [, message] of messages) {
+        if (!message.member) {
+          console.log(message);
+          return;
         }
-        const threadId = (await runMutation(internal.discord.addUniqueDoc, {
-          table: "threads",
-          doc: {
-            ...serializeThread(thread),
-            channelId,
-          },
-        })) as Id<"threads">;
-        const messages = await thread.messages.fetch();
-        const authorsAndMessagesToAdd: [DiscordUser, DiscordMessage][] = [];
-        for (const [, message] of messages) {
-          if (!message.member) {
-            console.log(message);
-            return;
-          }
-          authorsAndMessagesToAdd.push([
-            serializeAuthor(message),
-            serializeMessage(message),
-          ]);
-          await runMutation(internal.discord.addThreadBatch, {
-            authorsAndMessagesToAdd,
-            channelId,
-            threadId,
-          });
-        }
+        authorsAndMessagesToAdd.push([
+          serializeAuthor(message),
+          serializeMessage(message),
+        ]);
+        await runMutation(internal.discord.addThreadBatch, {
+          authorsAndMessagesToAdd,
+          channelId,
+          threadId,
+        });
       }
-    } finally {
-      await bot.destroy();
     }
   },
 });
