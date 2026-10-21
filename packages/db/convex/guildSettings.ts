@@ -122,6 +122,7 @@ export const reminderChannelsFor = internalQuery({
   returns: v.object({
     rulesChannelId: v.union(v.string(), v.null()),
     selfPromoChannelId: v.union(v.string(), v.null()),
+    supportForumId: v.union(v.string(), v.null()),
   }),
   handler: async ({ db }, { guildId }) => {
     const row = await db
@@ -131,6 +132,7 @@ export const reminderChannelsFor = internalQuery({
     return {
       rulesChannelId: row?.rulesChannelId ?? null,
       selfPromoChannelId: row?.selfPromoChannelId ?? null,
+      supportForumId: row?.forwardToForumId ?? row?.tagForumId ?? null,
     };
   },
 });

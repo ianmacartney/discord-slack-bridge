@@ -1,17 +1,10 @@
 "use node";
-import { Client, GatewayIntentBits } from "discord.js";
+import { Routes } from "discord.js";
 import { internalAction, env } from "./_generated/server";
 import { v } from "convex/values";
+import { discordRest } from "./discord_node";
 
-const discordClient = async () => {
-  const bot = new Client({
-    intents: [GatewayIntentBits.Guilds],
-  });
-  const token = env.VERIFICATION_DISCORD_TOKEN;
-  if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
-  await bot.login(token);
-  return bot;
-};
+const verificationRest = () => discordRest(env.VERIFICATION_DISCORD_TOKEN);
 
 function getEnvIds() {
   const guildId = env.VERIFICATION_GUILD_ID;
@@ -40,15 +33,11 @@ export const addRole = internalAction({
     discordUserId: v.string(),
   },
   handler: async (_ctx, { discordUserId }) => {
-    const bot = await discordClient();
+    const rest = verificationRest();
     const { guildId, roleId } = getEnvIds();
 
-    const guild = await bot.guilds.fetch(guildId);
-    if (!guild) throw new Error(`Can’t find guild ${guildId}`);
-
     try {
-      const member = await guild.members.fetch(discordUserId);
-      await member.roles.add(roleId);
+      await rest.put(Routes.guildMemberRole(guildId, discordUserId, roleId));
       console.log("[verification] addRole succeeded", {
         discordUserId,
         guildId,
@@ -66,15 +55,11 @@ export const removeRole = internalAction({
     discordUserId: v.string(),
   },
   handler: async (_ctx, { discordUserId }) => {
-    const bot = await discordClient();
+    const rest = verificationRest();
     const { guildId, roleId } = getEnvIds();
 
-    const guild = await bot.guilds.fetch(guildId);
-    if (!guild) throw new Error(`Can’t find guild ${guildId}`);
-
     try {
-      const member = await guild.members.fetch(discordUserId);
-      await member.roles.remove(roleId);
+      await rest.delete(Routes.guildMemberRole(guildId, discordUserId, roleId));
       console.log("[verification] removeRole succeeded", {
         discordUserId,
         guildId,

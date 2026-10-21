@@ -12,8 +12,9 @@ import {
   env,
 } from "./_generated/server";
 import { apiMutation } from "./apiFunctions";
+import { limitPerPerson } from "./limits";
+import { checkRaid } from "./moderation";
 import { inviteCodes } from "./violations";
-import { timeoutTeamPing } from "./moderation";
 import {
   DiscordChannel,
   DiscordMessage,
@@ -136,7 +137,7 @@ export const receiveMessage = apiMutation({
     pingedTeam: v.optional(v.boolean()),
   },
   handler: async (ctx, { author, message, channel, thread, pingedTeam }) => {
-    if (!message.content) {
+    if (!message.content && !message.attachments?.length) {
       return;
     }
     const authorId = await getOrCreate(ctx.db, "users", author);
@@ -164,6 +165,16 @@ export const receiveMessage = apiMutation({
       threadId,
     });
 
+    const fromPerson =
+      !author.bot && (message.type === 0 || message.type === 19);
+    const partOfRaid =
+      fromPerson &&
+      (await checkRaid(
+        ctx,
+        messageId,
+        !(await limitPerPerson(ctx, "messages", author.id)).ok,
+      ));
+
     if (threadId && thread && message.id === thread.id) {
       await ctx.scheduler.runAfter(0, internal.tags.tagNewPost, { threadId });
     }
@@ -175,14 +186,6 @@ export const receiveMessage = apiMutation({
     ) {
       await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
         messageId,
-      });
-    }
-
-    if (!author.bot && pingedTeam) {
-      await timeoutTeamPing(ctx, {
-        targetDiscordUserId: author.id,
-        channelId: thread?.id ?? channel.id,
-        discordMessageId: message.id,
       });
     }
 
@@ -199,14 +202,16 @@ export const receiveMessage = apiMutation({
       });
     }
 
-    if (!author.bot && (message.type === 0 || message.type === 19)) {
+    if (fromPerson && !partOfRaid) {
       await ctx.scheduler.runAfter(0, internal.classify.classifyMessage, {
         messageId,
+        pingedTeam,
       });
     }
 
     if (
       (message.type === 0 || message.type === 19) &&
+      message.cleanContent &&
       dbChannel.slackChannelId
     ) {
       await ctx.scheduler.runAfter(0, internal.slack_node.sendMessage, {

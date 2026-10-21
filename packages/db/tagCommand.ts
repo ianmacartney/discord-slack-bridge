@@ -10,6 +10,7 @@ import {
   ForumChannel,
   Guild,
   GuildForumTagData,
+  MessageFlags,
   PermissionFlagsBits as P,
   SlashCommandBuilder,
 } from "discord.js";
@@ -29,7 +30,6 @@ export const tagsCommand = new SlashCommandBuilder()
   .setDescription("Auto-tagging of new support posts")
   // Moderators (anyone who can delete messages) and admins by default.
   .setDefaultMemberPermissions(P.ManageMessages)
-  .setDMPermission(false)
   .addSubcommand((s) =>
     s
       .setName("forum")
@@ -417,11 +417,11 @@ export async function handleTagsCommand(
   if (!guild) {
     await interaction.reply({
       content: "Use this in a server.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     const sub = interaction.options.getSubcommand();
     let change: string;

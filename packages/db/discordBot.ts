@@ -8,6 +8,8 @@ import {
   ComponentType,
   EmbedBuilder,
   GatewayIntentBits,
+  MessageFlags,
+  Partials,
   PermissionFlagsBits,
   StringSelectMenuBuilder,
 } from "discord.js";
@@ -72,9 +74,11 @@ const bot = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.MessageContent,
   ],
+  // Without this, edits and deletes of messages sent before the bot (re)started are dropped.
+  partials: [Partials.Message],
 });
 
-bot.on("ready", async () => {
+bot.on("clientReady", async () => {
   console.log(`Logged in as ${bot.user?.tag}!`);
   console.log(
     `Bot is in ${bot.guilds.cache.size} guilds: ${bot.guilds.cache.map((guild) => guild.name).join(", ")}`,
@@ -169,6 +173,16 @@ bot.on("messageDelete", async (msg) => {
 bot.on("threadCreate", async (thread) => {
   console.log(`new thread ${thread.id} "${thread.name}" in ${thread.parentId}`);
   if (autoReplyChannelId && thread.parentId === autoReplyChannelId) {
+    // The bot opens a post to forward someone's message into it. Listen before anything else awaits, so the welcome
+    // comes after the forwarded message.
+    const forwarded =
+      thread.ownerId === bot.user?.id
+        ? thread.awaitMessages({
+            filter: (m) => m.messageSnapshots.size > 0,
+            max: 1,
+            time: 15_000,
+          })
+        : null;
     try {
       const embed = new EmbedBuilder().setColor("#d7b3cf").setDescription(
         `**Thanks for posting in <#1088161997662724167>.**
@@ -189,6 +203,7 @@ bot.on("threadCreate", async (thread) => {
           .setStyle(ButtonStyle.Success),
       );
 
+      await forwarded;
       await thread.send({
         embeds: [embed],
         components: [actionRow],
@@ -326,7 +341,7 @@ bot.on("interactionCreate", async (interaction) => {
     if (!needed || !interaction.memberPermissions?.has(needed)) {
       await interaction.followUp({
         content: `You need permission to ${choice} members to press this.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -358,14 +373,14 @@ bot.on("interactionCreate", async (interaction) => {
       console.error(e);
       await interaction.followUp({
         content: "Something went wrong.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     return;
   }
 
   if (interaction.isButton() && interaction.customId.startsWith("tag:edit:")) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)
     ) {
@@ -428,7 +443,7 @@ bot.on("interactionCreate", async (interaction) => {
     ) {
       await interaction.followUp({
         content: "You need Manage Messages to edit tags.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -503,7 +518,7 @@ bot.on("interactionCreate", async (interaction) => {
       console.error(e);
       await interaction.followUp({
         content: "Something went wrong.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     return;
@@ -516,7 +531,7 @@ bot.on("interactionCreate", async (interaction) => {
     ) {
       await interaction.followUp({
         content: "You need Manage Messages to undo a tag.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -553,7 +568,7 @@ bot.on("interactionCreate", async (interaction) => {
       console.error(e);
       await interaction.followUp({
         content: "Something went wrong.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     return;
@@ -567,7 +582,7 @@ bot.on("interactionCreate", async (interaction) => {
     if (!needed || !interaction.memberPermissions?.has(needed)) {
       await interaction.followUp({
         content: `You need permission to ${action} members to decide this.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -589,7 +604,7 @@ bot.on("interactionCreate", async (interaction) => {
       console.error(e);
       await interaction.followUp({
         content: "Something went wrong.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     return;
@@ -601,7 +616,7 @@ bot.on("interactionCreate", async (interaction) => {
     ) {
       await interaction.reply({
         content: "Only moderators can change whether this is resolved.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -667,7 +682,7 @@ bot.on("interactionCreate", async (interaction) => {
 
       await interaction.followUp({
         content: "Failed to resolve thread. Please try again later.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
 
       await interaction.editReply({
