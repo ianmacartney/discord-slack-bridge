@@ -136,6 +136,13 @@ async function handleViolation(
     reason += `; not ${punishment === "ban" ? "banned" : "kicked"} automatically in a VIP channel`;
     punishment = "timeout";
   }
+  const memberForAMonth =
+    !!author.joinedTimestamp &&
+    Date.now() - author.joinedTimestamp > 30 * 86_400_000;
+  if (kind === "raid" && punishment === "ban" && memberForAMonth) {
+    reason += "; member for 30+ days, a mod decides";
+    punishment = "timeout";
+  }
   const harsherOrEqual: NewAction["action"][] =
     punishment === "timeout" ? ["ban", "kick", "timeout"] : ["ban", "kick"];
   for (const action of harsherOrEqual) {
