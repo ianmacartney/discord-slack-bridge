@@ -5,6 +5,7 @@ import {
   ChannelType,
   ChatInputCommandInteraction,
   Guild,
+  MessageFlags,
   PermissionFlagsBits as P,
   SlashCommandBuilder,
 } from "discord.js";
@@ -17,7 +18,6 @@ export const modChannelCommand = new SlashCommandBuilder()
     "Choose the private channel for moderator notes and proposals (admins only)",
   )
   .setDefaultMemberPermissions(P.Administrator)
-  .setDMPermission(false)
   .addSubcommand((s) =>
     s
       .setName("set")
@@ -71,11 +71,11 @@ export async function handleModChannelCommand(
   if (!guild || !interaction.memberPermissions?.has(P.Administrator)) {
     await interaction.reply({
       content: "Only server admins can use this.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     const sub = interaction.options.getSubcommand();
     if (sub === "set") {

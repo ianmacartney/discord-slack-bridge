@@ -9,6 +9,7 @@ import {
   ChatInputCommandInteraction,
   Guild,
   Message,
+  MessageFlags,
   PermissionFlagsBits as P,
   SlashCommandBuilder,
 } from "discord.js";
@@ -21,7 +22,6 @@ export const forwardFromCommand = new SlashCommandBuilder()
     "Choose the chat channel whose long help requests become support posts",
   )
   .setDefaultMemberPermissions(P.ManageMessages)
-  .setDMPermission(false)
   .addSubcommand((s) =>
     s
       .setName("set")
@@ -113,11 +113,11 @@ export async function handleForwardFromCommand(
   if (!guild) {
     await interaction.reply({
       content: "Use this in a server.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     const sub = interaction.options.getSubcommand();
     if (sub === "set") {

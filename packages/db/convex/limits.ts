@@ -9,6 +9,8 @@ const limiter = new RateLimiter(components.rateLimiter, {
     period: 5 * MINUTE,
     capacity: 1,
   },
+  // More than this starts a spam-raid check (it never deletes on its own).
+  messages: { kind: "fixed window", rate: 5, period: MINUTE },
 });
 
 type LimitName = keyof NonNullable<typeof limiter.limits>;;

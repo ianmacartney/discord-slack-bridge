@@ -6,6 +6,7 @@ import {
   ChatInputCommandInteraction,
   ComponentType,
   Guild,
+  MessageFlags,
   PermissionFlagsBits as P,
   SlashCommandBuilder,
 } from "discord.js";
@@ -42,7 +43,6 @@ export async function registerChannelSettingCommands(guild: Guild) {
         .setName(name)
         .setDescription(description)
         .setDefaultMemberPermissions(P.ManageMessages)
-        .setDMPermission(false)
         .toJSON(),
     );
   }
@@ -60,11 +60,11 @@ export async function handleChannelSettingCommand(
   if (!guild || !interaction.memberPermissions?.has(P.ManageMessages)) {
     await interaction.reply({
       content: "Only moderators can use this.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     const name = interaction.commandName as Name;
     const { label, max } = COMMANDS[name];

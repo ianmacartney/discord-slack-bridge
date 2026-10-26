@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as aiGateway from "../aiGateway.js";
 import type * as algolia from "../algolia.js";
 import type * as apiFunctions from "../apiFunctions.js";
 import type * as brandColors from "../brandColors.js";
@@ -45,6 +46,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiGateway: typeof aiGateway;
   algolia: typeof algolia;
   apiFunctions: typeof apiFunctions;
   brandColors: typeof brandColors;

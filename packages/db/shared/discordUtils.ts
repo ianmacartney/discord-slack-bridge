@@ -53,6 +53,11 @@ export function serializeMessage(msg: Message): DiscordMessage {
     system: msg.system,
     type: msg.type,
     json: msg.toJSON(),
+    attachments: msg.attachments.map((a) => ({
+      name: a.name,
+      size: a.size,
+      contentType: a.contentType,
+    })),
   };
 }
 

@@ -1,5 +1,6 @@
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { raidState } from "./classify";
 import { Doc, Id } from "./_generated/dataModel";
 import {
   internalAction,
@@ -11,7 +12,13 @@ import { apiMutation } from "./apiFunctions";
 import { ModAlerts, moderationActionKind } from "./schema";
 import {
   CLASSIFIED_VIOLATIONS,
+  CROSS_POST_CHANNELS,
+  isRaidBait,
   MOD_TIMEOUT_MINUTES,
+  postFingerprint,
+  RAID_WINDOW_MS,
+  teamPingMinutes,
+  teamPingTimesOut,
   THRESHOLD_DEFAULTS,
   ThresholdName,
   VIOLATION_TIMEOUT_MINUTES,
@@ -23,7 +30,6 @@ const PROPOSED_TIMEOUT_MINUTES = 60;
 const KICK_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KICK_PROPOSAL_COUNT = 5;
 export const BAN_DELETE_DAYS = 7;
-const TEAM_PING_TIMEOUT_MINUTES = 60;
 const CHAT_TIMEOUT_MINUTES = VIOLATION_TIMEOUT_MINUTES;
 
 export const get = internalQuery({
@@ -109,7 +115,7 @@ async function handleViolation(
   kind: string,
   confidence: number | undefined,
   reason: string,
-  ban = false,
+  punishment: "timeout" | "kick" | "ban" = "timeout",
 ) {
   const message = await ctx.db.get("messages", messageId);
   if (!message) return;
@@ -121,15 +127,21 @@ async function handleViolation(
   if (!author || !channel || author.bot) return;
   const channelId = thread?.id ?? channel.id;
   if (
-    ban &&
+    punishment !== "timeout" &&
+    kind !== "raid" &&
     (await allSettings(ctx)).some((s) =>
       s.vipChannelIds?.some((id) => id === channel.id || id === thread?.id),
     )
   ) {
-    ban = false;
-    reason += "; not banned automatically in a VIP channel";
+    reason += `; not ${punishment === "ban" ? "banned" : "kicked"} automatically in a VIP channel`;
+    punishment = "timeout";
   }
-  if (ban) {
+  const harsherOrEqual: NewAction["action"][] =
+    punishment === "timeout" ? ["ban", "kick", "timeout"] : ["ban", "kick"];
+  for (const action of harsherOrEqual) {
+    if (await countRecent(ctx, author.id, action, RAID_WINDOW_MS)) return;
+  }
+  if (punishment !== "timeout") {
     const base = {
       auto: true,
       category: kind,
@@ -138,11 +150,13 @@ async function handleViolation(
       channelId,
       discordMessageId: message.id,
     };
-    await record(ctx, { ...base, action: "delete", reason });
+    if (punishment === "kick") {
+      await record(ctx, { ...base, action: "delete", reason });
+    }
     await record(ctx, {
       ...base,
-      action: "ban",
-      deleteMessageDays: BAN_DELETE_DAYS,
+      action: punishment,
+      ...(punishment === "ban" && { deleteMessageDays: BAN_DELETE_DAYS }),
       reason,
     });
     return;
@@ -180,7 +194,7 @@ async function handleViolation(
 async function remind(
   ctx: MutationCtx,
   messageId: Doc<"messages">["_id"],
-  kind: "dm_solicitation" | "convex_self_promo",
+  kind: "convex_self_promo",
   confidence: number,
 ) {
   const message = await ctx.db.get("messages", messageId);
@@ -199,26 +213,256 @@ async function remind(
     channelId: thread?.id ?? channel.id,
     discordMessageId: message.id,
   };
-  const jev = `(Jev, ${Math.round(confidence * 100)}%)`;
-  if (kind === "convex_self_promo") {
-    const promo = (await allSettings(ctx)).find(
-      (s) => s.selfPromoChannelId,
-    )?.selfPromoChannelId;
-    if (!promo || promo === channel.id || promo === thread?.id) return;
-    await record(ctx, {
-      ...base,
-      action: "delete",
-      reason: `Convex self-promotion outside the self-promo channel ${jev}`,
-    });
-    return;
-  }
+  const promo = (await allSettings(ctx)).find(
+    (s) => s.selfPromoChannelId,
+  )?.selfPromoChannelId;
+  if (!promo || promo === channel.id || promo === thread?.id) return;
   await record(ctx, {
     ...base,
-    action: "timeout",
-    durationMinutes: VIOLATION_TIMEOUT_MINUTES,
-    reason: `Asked people to DM, or said they sent someone a DM ${jev}`,
+    action: "delete",
+    reason: `Convex self-promotion outside the self-promo channel (Jev, ${Math.round(confidence * 100)}%)`,
   });
 }
+
+const RAID_HISTORY = 5;
+const RAID_POSTS = 10;
+const RAID_TEXT_CHARS = 500;
+
+const placeOf = async (ctx: MutationCtx, m: Doc<"messages">) => {
+  const [channel, thread] = await Promise.all([
+    ctx.db.get("channels", m.channelId),
+    m.threadId ? ctx.db.get("threads", m.threadId) : null,
+  ]);
+  return {
+    id: thread?.id ?? channel?.id ?? "",
+    name: thread?.name ?? channel?.name ?? "unknown",
+  };
+};
+
+// Punishments that mean their messages are already known to be spam, scams or other violations.
+const VIOLATION_KINDS = new Set<string>([
+  ...CLASSIFIED_VIOLATIONS,
+  "raid",
+  "discord_invite",
+  "dm_solicitation",
+]);
+
+const hasRecentViolation = async (
+  ctx: MutationCtx,
+  targetDiscordUserId: string,
+) => {
+  for (const action of ["ban", "timeout"] as const) {
+    const recent = await ctx.db
+      .query("moderationActions")
+      .withIndex("by_targetDiscordUserId_and_action", (q) =>
+        q
+          .eq("targetDiscordUserId", targetDiscordUserId)
+          .eq("action", action)
+          .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
+      )
+      .take(10);
+    if (recent.some((a) => a.auto && VIOLATION_KINDS.has(a.category ?? ""))) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * Runs on every message a person sends. Spots a spam raid (the same post in several channels, or going over the
+ * message rate limit) and acts once per raid. Returns true when the message belongs to a raid, so it skips per-message
+ * classification and punishment.
+ */
+export const checkRaid = async (
+  ctx: MutationCtx,
+  messageId: Id<"messages">,
+  overRateLimit: boolean,
+) => {
+  const message = await ctx.db.get("messages", messageId);
+  if (!message) return false;
+  const author = await ctx.db.get("users", message.authorId);
+  if (!author || author.bot) return false;
+  const since = Date.now() - RAID_WINDOW_MS;
+  const [newestFirst, raids] = await Promise.all([
+    ctx.db
+      .query("messages")
+      .withIndex("by_authorId", (q) =>
+        q.eq("authorId", message.authorId).gt("_creationTime", since),
+      )
+      .order("desc")
+      .take(25),
+    ctx.db
+      .query("raids")
+      .withIndex("by_authorId", (q) =>
+        q.eq("authorId", message.authorId).gt("_creationTime", since),
+      )
+      .take(5),
+  ]);
+  const recent = newestFirst.reverse();
+  const fingerprint = postFingerprint(message.content, message.attachments);
+
+  const open = raids.find((r) => r.decision !== "ignored");
+  if (open) {
+    const place = await placeOf(ctx, message);
+    await ctx.db.patch("raids", open._id, {
+      messageIds: [...open.messageIds, messageId],
+      channelIds: [...new Set([...open.channelIds, place.id])],
+      spreadSeconds: Math.round(
+        open.spreadSeconds +
+          (message._creationTime - open._creationTime) / 1000,
+      ),
+    });
+    return true;
+  }
+
+  const alreadyCleared = (trigger: Doc<"raids">["trigger"]) =>
+    raids.some(
+      (r) =>
+        r.trigger === trigger &&
+        (trigger === "rate_limit" || r.fingerprint === fingerprint),
+    );
+  const copies = fingerprint
+    ? recent.filter(
+        (m) => postFingerprint(m.content, m.attachments) === fingerprint,
+      )
+    : [];
+  const crossPost =
+    new Set(copies.map((m) => m.threadId ?? m.channelId)).size >=
+      CROSS_POST_CHANNELS && !alreadyCleared("cross_post");
+  const rateLimited = overRateLimit && !alreadyCleared("rate_limit");
+  if (!crossPost && !rateLimited) return false;
+
+  const trigger = crossPost ? "cross_post" : "rate_limit";
+  const posts = (crossPost ? copies : recent).slice(-RAID_POSTS);
+  const first = posts[0];
+  const spreadSeconds = Math.round(
+    (message._creationTime - first._creationTime) / 1000,
+  );
+  const [earlier, places] = await Promise.all([
+    ctx.db
+      .query("messages")
+      .withIndex("by_authorId", (q) =>
+        q
+          .eq("authorId", message.authorId)
+          .lt("_creationTime", first._creationTime),
+      )
+      .order("desc")
+      .take(RAID_HISTORY),
+    Promise.all(posts.map((m) => placeOf(ctx, m))),
+  ]);
+  const channelIds = [...new Set(places.map((p) => p.id))];
+  const bait = crossPost && isRaidBait(message.content, message.attachments);
+  const flagged = !bait && (await hasRecentViolation(ctx, author.id));
+  const fastPath = bait || flagged;
+  const raidId = await ctx.db.insert("raids", {
+    authorId: message.authorId,
+    trigger,
+    fingerprint: crossPost ? fingerprint! : undefined,
+    channelIds,
+    messageIds: posts.map((m) => m._id),
+    spreadSeconds,
+    fastPath,
+    decision: fastPath ? "banned" : "pending",
+  });
+  const where = `${posts.length} messages in ${channelIds.length} channels over ${spreadSeconds}s`;
+
+  if (fastPath) {
+    await handleViolation(
+      ctx,
+      messageId,
+      "raid",
+      undefined,
+      `Spam raid: ${bait ? "same image or link post" : "messages already classified as spam"}, ${where}`,
+      "ban",
+    );
+    return true;
+  }
+  const state: Infer<typeof raidState> = {
+    trigger,
+    posts: posts.map((m, i) => ({
+      channel: places[i].name,
+      text: m.cleanContent.slice(0, RAID_TEXT_CHARS),
+      attachments: (m.attachments ?? []).map((a) => a.name),
+    })),
+    identical: crossPost,
+    spreadSeconds,
+    firstMessage: earlier.length === 0,
+    authorHistory: earlier
+      .reverse()
+      .map(
+        (m) =>
+          m.cleanContent.slice(0, RAID_TEXT_CHARS) ||
+          `[${m.attachments?.length ?? 0} images]`,
+      ),
+    joinedServer: author.joinedTimestamp
+      ? new Date(author.joinedTimestamp).toISOString()
+      : null,
+    accountCreated: new Date(author.createdTimestamp).toISOString(),
+  };
+  await ctx.scheduler.runAfter(0, internal.classify.judgeRaid, {
+    raidId,
+    messageId,
+    state,
+  });
+  return true;
+};
+
+export const settleRaid = internalMutation({
+  args: {
+    raidId: v.id("raids"),
+    messageId: v.id("messages"),
+    spamScore: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { raidId, messageId, spamScore }) => {
+    const raid = await ctx.db.get("raids", raidId);
+    if (!raid || raid.decision !== "pending") return null;
+    const author = await ctx.db.get("users", raid.authorId);
+    const spam =
+      spamScore >= THRESHOLD_DEFAULTS.raid ||
+      (!!author && (await hasRecentViolation(ctx, author.id)));
+    await ctx.db.patch("raids", raidId, {
+      spamScore,
+      decision: spam ? "banned" : "ignored",
+    });
+    if (spam) {
+      await handleViolation(
+        ctx,
+        messageId,
+        "raid",
+        spamScore,
+        `Spam raid (${raid.trigger === "cross_post" ? "same post in several channels" : "over the message rate limit"}): ` +
+          `${raid.messageIds.length} messages in ${raid.channelIds.length} channels over ${raid.spreadSeconds}s; ` +
+          `Jev ${Math.round(spamScore * 100)}% sure it's spam`,
+        "ban",
+      );
+    }
+    return null;
+  },
+});
+
+export const punishSupportBreak = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    dmScore: v.number(),
+    punishment: literals("timeout", "kick", "ban"),
+    confidence: v.optional(v.number()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { messageId, dmScore, punishment, confidence }) => {
+    const pct = (n = 0) => `${Math.round(n * 100)}%`;
+    await handleViolation(
+      ctx,
+      messageId,
+      "dm_solicitation",
+      dmScore,
+      `Sent people to support outside the Convex dashboard or community-support (Jev, ${pct(dmScore)}); ` +
+        `Jev chose ${punishment} (${pct(confidence)})`,
+      punishment,
+    );
+    return null;
+  },
+});
 
 export const applyPolicy = internalMutation({
   args: {
@@ -227,17 +471,113 @@ export const applyPolicy = internalMutation({
     confidence: v.optional(v.number()),
     banScore: v.optional(v.number()),
     dmScore: v.optional(v.number()),
+    scamScore: v.optional(v.number()),
+    teamPing: v.optional(
+      v.object({
+        aggressive: v.number(),
+        rude: v.number(),
+        goodReason: v.number(),
+        timeout: v.number(),
+      }),
+    ),
   },
   returns: v.null(),
   handler: async (
     ctx,
-    { messageId, category, confidence = 0, banScore = 0, dmScore = 0 },
+    {
+      messageId,
+      category,
+      confidence = 0,
+      banScore = 0,
+      dmScore = 0,
+      scamScore = 0,
+      teamPing,
+    },
   ) => {
     const min = THRESHOLD_DEFAULTS;
+    // Jev often splits a scam between spam and fraud; together they count as spam.
+    if (scamScore >= min.spam) {
+      category = "spam";
+      confidence = scamScore;
+    }
     if (
       (CLASSIFIED_VIOLATIONS as readonly string[]).includes(category) &&
       confidence >= min[category as ThresholdName]
     ) {
+      const message = await ctx.db.get("messages", messageId);
+      const raid =
+        message &&
+        (await ctx.db
+          .query("raids")
+          .withIndex("by_authorId", (q) =>
+            q
+              .eq("authorId", message.authorId)
+              .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
+          )
+          .first());
+      if (raid) {
+        if (raid.decision !== "banned") {
+          await ctx.db.patch("raids", raid._id, { decision: "banned" });
+        }
+        await handleViolation(
+          ctx,
+          messageId,
+          "raid",
+          confidence,
+          `Classified as ${category} (confidence ${confidence.toFixed(2)}) during a spam raid`,
+          "ban",
+        );
+        return null;
+      }
+      const scam = category === "spam" || category === "fraud_or_illegal";
+      const fingerprint =
+        scam && message
+          ? postFingerprint(message.content, message.attachments)
+          : null;
+      const copies =
+        message && fingerprint
+          ? (
+              await ctx.db
+                .query("messages")
+                .withIndex("by_authorId", (q) =>
+                  q
+                    .eq("authorId", message.authorId)
+                    .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
+                )
+                .order("desc")
+                .take(25)
+            ).filter(
+              (m) => postFingerprint(m.content, m.attachments) === fingerprint,
+            )
+          : [];
+      if (message && fingerprint && copies.length >= 2) {
+        const places = await Promise.all(copies.map((m) => placeOf(ctx, m)));
+        const spreadSeconds = Math.round(
+          (copies[0]._creationTime - copies[copies.length - 1]._creationTime) /
+            1000,
+        );
+        await ctx.db.insert("raids", {
+          authorId: message.authorId,
+          trigger: "repeat",
+          fingerprint,
+          channelIds: [...new Set(places.map((p) => p.id))],
+          messageIds: copies.map((m) => m._id),
+          spreadSeconds,
+          spamScore: confidence,
+          fastPath: true,
+          decision: "banned",
+        });
+        await handleViolation(
+          ctx,
+          messageId,
+          "raid",
+          confidence,
+          `Same ${category.replace(/_/g, " ")} message posted ${copies.length} times over ${spreadSeconds}s ` +
+            `(confidence ${confidence.toFixed(2)})`,
+          "ban",
+        );
+        return null;
+      }
       const ban = category === "spam" || banScore >= min.ban;
       await handleViolation(
         ctx,
@@ -250,12 +590,15 @@ export const applyPolicy = internalMutation({
             : ban
               ? `; Jev is ${Math.round(banScore * 100)}% sure this account is only here for that`
               : ""),
-        ban,
+        ban ? "ban" : "timeout",
       );
       return null;
     }
     if (dmScore >= min.dm_solicitation) {
-      await remind(ctx, messageId, "dm_solicitation", dmScore);
+      await ctx.scheduler.runAfter(0, internal.classify.judgeSupportBreak, {
+        messageId,
+        dmScore,
+      });
       return null;
     }
     if (
@@ -265,6 +608,9 @@ export const applyPolicy = internalMutation({
       await remind(ctx, messageId, "convex_self_promo", confidence);
       return null;
     }
+    const pingTimedOut =
+      !!teamPing && teamPingTimesOut(teamPing, min.team_ping);
+    if (pingTimedOut) await timeoutTeamPing(ctx, messageId, teamPing!);
     if (!(category === "harassment" && confidence >= min.harassment))
       return null;
 
@@ -294,13 +640,15 @@ export const applyPolicy = internalMutation({
       KICK_WINDOW_MS,
     );
     await record(ctx, { ...base, action: "delete", reason });
-    await record(ctx, {
-      ...base,
-      auto: false,
-      action: "timeout",
-      durationMinutes: PROPOSED_TIMEOUT_MINUTES,
-      reason,
-    });
+    if (!pingTimedOut) {
+      await record(ctx, {
+        ...base,
+        auto: false,
+        action: "timeout",
+        durationMinutes: PROPOSED_TIMEOUT_MINUTES,
+        reason,
+      });
+    }
     if (flaggedToday + 1 >= KICK_PROPOSAL_COUNT) {
       await record(ctx, {
         ...base,
@@ -338,26 +686,36 @@ export const banForInvite = internalMutation({
       "discord_invite",
       undefined,
       `Posted an invite to another Discord server (discord.gg/${code})`,
-      true,
+      "ban",
     );
     return null;
   },
 });
 
-export async function timeoutTeamPing(
+async function timeoutTeamPing(
   ctx: MutationCtx,
-  target: Pick<
-    NewAction,
-    "targetDiscordUserId" | "channelId" | "discordMessageId"
-  >,
+  messageId: Doc<"messages">["_id"],
+  scores: { aggressive: number; rude: number; timeout: number },
 ) {
+  const message = await ctx.db.get("messages", messageId);
+  if (!message) return;
+  const [author, channel, thread] = await Promise.all([
+    ctx.db.get("users", message.authorId),
+    ctx.db.get("channels", message.channelId),
+    message.threadId ? ctx.db.get("threads", message.threadId) : null,
+  ]);
+  if (!author || !channel || author.bot) return;
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
   await record(ctx, {
-    ...target,
     auto: true,
     action: "timeout",
     category: "team_ping",
-    durationMinutes: TEAM_PING_TIMEOUT_MINUTES,
-    reason: "Pinged the Convex team",
+    confidence: scores.timeout,
+    targetDiscordUserId: author.id,
+    channelId: thread?.id ?? channel.id,
+    discordMessageId: message.id,
+    durationMinutes: teamPingMinutes(scores.aggressive, scores.rude),
+    reason: `Pinged the Convex team without a good reason (Jev: timeout ${pct(scores.timeout)}, aggressive ${pct(scores.aggressive)}, rude ${pct(scores.rude)})`,
   });
 }
 

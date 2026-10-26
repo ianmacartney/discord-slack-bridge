@@ -1,7 +1,15 @@
 "use node";
 
 import { v } from "convex/values";
-import { ChannelType, Client, GatewayIntentBits } from "discord.js";
+import {
+  APIMessage,
+  ChannelType,
+  Client,
+  GatewayIntentBits,
+  REST,
+  RESTPostAPIChannelMessageJSONBody,
+  Routes,
+} from "discord.js";
 import {
   serializeAuthor,
   serializeChannel,
@@ -12,6 +20,18 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { internalAction, env } from "./_generated/server";
 import { DiscordMessage, DiscordUser } from "./schema";
+
+export const discordRest = (token: string | undefined = env.DISCORD_TOKEN) => {
+  if (!token) throw new Error("Specify discord DISCORD_TOKEN in the dashboard");
+  return new REST({ version: "10" }).setToken(token);
+};
+
+export const sendMessage = (
+  rest: REST,
+  channelId: string,
+  body: RESTPostAPIChannelMessageJSONBody,
+) =>
+  rest.post(Routes.channelMessages(channelId), { body }) as Promise<APIMessage>;
 
 // Actions only send things through the REST API, so by default they ask for no privileged intents.
 // The long-running bot (discordBot.ts) is what listens with Message Content and Server Members.
@@ -91,16 +111,9 @@ export const replyFromSlack = internalAction({
   },
   handler: async ({}, { channelId, userId, reply }) => {
     console.log(channelId, userId, reply);
-    const bot = await discordClient();
-    const channel = await bot.channels.fetch(channelId);
-    if (!channel) {
-      throw new Error(`Channel ${channelId} not found`);
-    }
-    if (!("send" in channel)) {
-      throw new Error("Cannot reply to categories");
-    }
-
-    await channel.send(`<@${userId}>: ${reply}`);
+    await sendMessage(discordRest(), channelId, {
+      content: `<@${userId}>: ${reply}`,
+    });
   },
 });
 
@@ -110,14 +123,8 @@ export const applyTags = internalAction({
     tags: v.array(v.string()),
   },
   handler: async (_ctx, { threadId, tags }) => {
-    const bot = await discordClient();
-    const thread = await bot.channels.fetch(threadId);
-    if (!thread) {
-      throw new Error(`Thread ${threadId} not found`);
-    }
-    if (thread.type !== ChannelType.PublicThread) {
-      throw new Error("Can only set tags on threads");
-    }
-    await thread.setAppliedTags(tags);
+    await discordRest().patch(Routes.channel(threadId), {
+      body: { applied_tags: tags },
+    });
   },
 });
