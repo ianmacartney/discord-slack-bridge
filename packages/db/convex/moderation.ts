@@ -517,15 +517,16 @@ export const applyPolicy = internalMutation({
       const message = await ctx.db.get("messages", messageId);
       const raid =
         message &&
-        (await ctx.db
-          .query("raids")
-          .withIndex("by_authorId", (q) =>
-            q
-              .eq("authorId", message.authorId)
-              .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
-          )
-          .filter((q) => q.neq(q.field("decision"), "ignored"))
-          .first());
+        (
+          await ctx.db
+            .query("raids")
+            .withIndex("by_authorId", (q) =>
+              q
+                .eq("authorId", message.authorId)
+                .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
+            )
+            .take(5)
+        ).find((r) => r.decision !== "ignored");
       if (raid) {
         if (raid.decision !== "banned") {
           await ctx.db.patch("raids", raid._id, { decision: "banned" });
