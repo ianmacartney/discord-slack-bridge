@@ -310,13 +310,16 @@ export const checkRaid = async (
 
   const open = raids.find((r) => r.decision !== "ignored");
   if (open) {
-    const place = await placeOf(ctx, message);
+    const [place, first] = await Promise.all([
+      placeOf(ctx, message),
+      ctx.db.get("messages", open.messageIds[0]),
+    ]);
     await ctx.db.patch("raids", open._id, {
       messageIds: [...open.messageIds, messageId],
       channelIds: [...new Set([...open.channelIds, place.id])],
       spreadSeconds: Math.round(
-        open.spreadSeconds +
-          (message._creationTime - open._creationTime) / 1000,
+        (message._creationTime - (first?._creationTime ?? open._creationTime)) /
+          1000,
       ),
     });
     return true;
@@ -521,6 +524,7 @@ export const applyPolicy = internalMutation({
               .eq("authorId", message.authorId)
               .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
           )
+          .filter((q) => q.neq(q.field("decision"), "ignored"))
           .first());
       if (raid) {
         if (raid.decision !== "banned") {
