@@ -67,7 +67,7 @@ const dmQuestion = (isModerator: boolean) =>
       '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
       "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely. " +
       'Telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, such as a social media post or ticket page, is yes, even with nothing else in the message. ' +
-      "Mentioning a DM for something other than getting help or support, such as a meetup or a casual chat, is no. " +
+      'Mentioning a DM for something other than getting help or support is no, such as a meetup, or a friendly invite to chat ("happy to chat about how we use Convex, feel free to DM me"). Only a DM that offers to help, fix or support someone is yes. ' +
       supportCheck(isModerator) +
       ONLY_THE_MESSAGE,
   }) as const;
