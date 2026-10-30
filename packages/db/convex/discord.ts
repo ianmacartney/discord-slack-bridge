@@ -180,10 +180,9 @@ export const receiveMessage = apiMutation({
       fromModerator,
     });
 
-    const checkable =
-      !author.bot &&
-      !fromModerator &&
-      (message.type === 0 || message.type === 19);
+    const fromPerson =
+      !author.bot && (message.type === 0 || message.type === 19);
+    const checkable = fromPerson && !fromModerator;
     const partOfRaid =
       checkable &&
       (await checkRaid(
@@ -213,7 +212,7 @@ export const receiveMessage = apiMutation({
 
     // Classifying is how a message gets forwarded, so a private channel still counts if it's the /forwardfrom channel.
     if (
-      checkable &&
+      fromPerson &&
       !partOfRaid &&
       (!privateChannel ||
         (!thread &&

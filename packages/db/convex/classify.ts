@@ -383,29 +383,43 @@ export const classifyMessage = internalAction({
 
     if (!message) return null;
 
-    const { answers } = await decide(
-      {
-        message: message.text,
-        author: message.author,
-        thread: message.threadName,
-        earlierMessages: message.earlierMessages,
-        replyTo: message.replyTo,
-        mentionedPeople: message.mentionedPeople,
-        isModerator: message.isModerator,
+    const state = {
+      message: message.text,
+      author: message.author,
+      thread: message.threadName,
+      earlierMessages: message.earlierMessages,
+      replyTo: message.replyTo,
+      mentionedPeople: message.mentionedPeople,
+      isModerator: message.isModerator,
+    };
+
+    // Moderators only get the support check, so nothing else Jev could say applies to them.
+    if (message.isModerator) {
+      const { answers } = await decide(state, { dm: dmQuestion(true) });
+      const dmScore = answers.dm.type === "noul" ? answers.dm.noul : 0;
+      console.log(
+        `support check on moderator ${message.author}: "${message.text.slice(0, 60)}" (dm ${dmScore})`,
+      );
+      await ctx.runMutation(internal.moderation.applyPolicy, {
+        messageId,
+        category: "normal",
+        dmScore,
+      });
+      return null;
+    }
+
+    const { answers } = await decide(state, {
+      category: {
+        type: "choice",
+        instructions:
+          "Which category best describes this Discord message?" +
+          ONLY_THE_MESSAGE,
+        criteria: MESSAGE_CATEGORIES,
       },
-      {
-        category: {
-          type: "choice",
-          instructions:
-            "Which category best describes this Discord message?" +
-            ONLY_THE_MESSAGE,
-          criteria: MESSAGE_CATEGORIES,
-        },
-        ban: BAN_QUESTION,
-        dm: dmQuestion(message.isModerator),
-        ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
-      },
-    );
+      ban: BAN_QUESTION,
+      dm: dmQuestion(message.isModerator),
+      ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
+    });
 
     const answer = answers.category;
     if (answer.type !== "choice")
