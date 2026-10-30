@@ -170,7 +170,10 @@ export const getMessageForClassification = internalQuery({
       earlierMessages: await Promise.all(
         earlier.filter(kept).reverse().map(brief),
       ),
-      replyTo: kept(replied) ? await brief(replied) : undefined,
+      replyTo:
+        kept(replied) && (message.privateChannel || !replied.privateChannel)
+          ? await brief(replied)
+          : undefined,
       mentionedPeople: new Set(message.content.match(/<@!?\d+>/g)).size,
     };
   },
@@ -255,6 +258,7 @@ export const getSupportBreak = internalQuery({
       message: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
       firstMessage: earlier.length === 0,
       authorHistory: earlier
+        .filter((m) => !m.privateChannel)
         .reverse()
         .map((m) => m.cleanContent.slice(0, MAX_EARLIER_CHARS)),
       joinedServer: author.joinedTimestamp

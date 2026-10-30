@@ -276,7 +276,7 @@ const hasRecentViolation = async (
 };
 
 /**
- * Runs on every message a person sends. Spots a spam raid (the same post in several channels, or going over the
+ * Runs on every message a non-moderator sends. Spots a spam raid (the same post in several channels, or going over the
  * message rate limit) and acts once per raid. Returns true when the message belongs to a raid, so it skips per-message
  * classification and punishment.
  */

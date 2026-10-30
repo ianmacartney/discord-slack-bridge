@@ -1,7 +1,19 @@
 import assert from "node:assert/strict";
-import { PermissionFlagsBits as P } from "discord.js";
-import type { APIGuild, APIGuildMember } from "discord.js";
-import { isModerator, outranksMember } from "./shared/memberChecks.ts";
+import {
+  ChannelType,
+  PermissionFlagsBits as P,
+  PermissionsBitField,
+} from "discord.js";
+import type {
+  APIGuild,
+  APIGuildMember,
+  GuildTextBasedChannel,
+} from "discord.js";
+import {
+  isModerator,
+  isPublicChannel,
+  outranksMember,
+} from "./shared/memberChecks.ts";
 
 const GUILD = "100";
 const MEMBER = "101";
@@ -51,6 +63,30 @@ assert.equal(
 );
 assert.equal(
   outranksMember(guild(), member(NEWER_TIED), member(OLDER_TIED)),
+  false,
+);
+
+const channel = (type: ChannelType, everyone: bigint | null) =>
+  ({
+    type,
+    guild: { roles: { everyone: {} } },
+    permissionsFor: () =>
+      everyone === null ? null : new PermissionsBitField(everyone),
+  }) as unknown as GuildTextBasedChannel;
+
+assert.equal(
+  isPublicChannel(channel(ChannelType.GuildText, P.ViewChannel)),
+  true,
+);
+assert.equal(isPublicChannel(channel(ChannelType.GuildText, 0n)), false);
+assert.equal(
+  isPublicChannel(channel(ChannelType.PublicThread, P.ViewChannel)),
+  true,
+);
+assert.equal(isPublicChannel(channel(ChannelType.PublicThread, 0n)), false);
+assert.equal(isPublicChannel(channel(ChannelType.PublicThread, null)), false);
+assert.equal(
+  isPublicChannel(channel(ChannelType.PrivateThread, P.ViewChannel)),
   false,
 );
 
