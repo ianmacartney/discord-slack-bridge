@@ -13,7 +13,6 @@ const MAX_MESSAGE_CHARS = 4000;
 // 20 x 1000 + 4000 stays under the ~32KB where Jev switches to its slower long-context mode.
 const EARLIER_MESSAGES = 20;
 const MAX_EARLIER_CHARS = 1000;
-const AUTHOR_HISTORY = 5;
 const ONLY_THE_MESSAGE =
   " Judge `message` only; `earlierMessages` and `replyTo` are the conversation before it.";
 
@@ -68,27 +67,9 @@ const dmQuestion = (isModerator: boolean) =>
       '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
       "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely. " +
       'Telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, such as a social media post or ticket page, is yes, even with nothing else in the message. ' +
+      "Mentioning a DM for something other than getting help or support, such as a meetup or a casual chat, is no. " +
       supportCheck(isModerator) +
       ONLY_THE_MESSAGE,
-  }) as const;
-
-const supportPunishment = (isModerator: boolean) =>
-  ({
-    type: "choice",
-    instructions:
-      `Server rule: ${SUPPORT_RULE} ` +
-      "`message` breaks that rule. Decide what happens to its author, from `firstMessage` (whether this is the first " +
-      "message they have posted here), `authorHistory` (their messages before this one, oldest first), `joinedServer` " +
-      "and `accountCreated`. Be strict: when torn between two options, choose the harsher one. " +
-      supportCheck(isModerator),
-    criteria: {
-      ban:
-        "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away. " +
-        'Also ban for telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, whatever their history.',
-      kick: "They have posted before, but nothing that shows a genuine Convex user.",
-      timeout:
-        "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
-    },
   }) as const;
 
 // Only asked when the message tags the Convex team.
@@ -242,50 +223,6 @@ export const getMessageByDiscordId = internalQuery({
   },
 });
 
-const supportBreak = v.object({
-  message: v.string(),
-  firstMessage: v.boolean(),
-  authorHistory: v.array(v.string()),
-  joinedServer: v.union(v.null(), v.string()),
-  accountCreated: v.string(),
-  isModerator: v.boolean(),
-});
-
-export const getSupportBreak = internalQuery({
-  args: { messageId: v.id("messages") },
-  returns: v.union(v.null(), supportBreak),
-  handler: async ({ db }, { messageId }) => {
-    const message = await db.get("messages", messageId);
-    if (!message) return null;
-    const [author, earlier] = await Promise.all([
-      db.get("users", message.authorId),
-      db
-        .query("messages")
-        .withIndex("by_authorId", (q) =>
-          q
-            .eq("authorId", message.authorId)
-            .lt("_creationTime", message._creationTime),
-        )
-        .order("desc")
-        .take(AUTHOR_HISTORY),
-    ]);
-    if (!author) return null;
-    return {
-      message: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
-      firstMessage: earlier.length === 0,
-      authorHistory: earlier
-        .filter((m) => !m.privateChannel)
-        .reverse()
-        .map((m) => m.cleanContent.slice(0, MAX_EARLIER_CHARS)),
-      joinedServer: author.joinedTimestamp
-        ? new Date(author.joinedTimestamp).toISOString()
-        : null,
-      accountCreated: new Date(author.createdTimestamp).toISOString(),
-      isModerator: !!message.fromModerator,
-    };
-  },
-});
-
 const RAID_QUESTION = {
   type: "noul",
   instructions:
@@ -334,38 +271,6 @@ export const judgeRaid = internalAction({
       raidId,
       messageId,
       spamScore,
-    });
-    return null;
-  },
-});
-
-/** Someone broke the support rule: Jev picks ban, kick or a one-day timeout from their history. */
-export const judgeSupportBreak = internalAction({
-  args: { messageId: v.id("messages"), dmScore: v.number() },
-  returns: v.null(),
-  handler: async (ctx, { messageId, dmScore }): Promise<null> => {
-    const state: Infer<typeof supportBreak> | null = await ctx.runQuery(
-      internal.classify.getSupportBreak,
-      { messageId },
-    );
-    if (!state) return null;
-    const { answers } = await decide(state, {
-      punishment: supportPunishment(state.isModerator),
-    });
-    const answer = answers.punishment;
-    const punishment =
-      answer.type === "choice" &&
-      (answer.choice === "ban" || answer.choice === "kick")
-        ? answer.choice
-        : "timeout";
-    console.log(
-      `support rule broken (first message ${state.firstMessage}, ${state.authorHistory.length} earlier): ${punishment} (confidence ${answer.type === "choice" ? answer.confidence : "n/a"})`,
-    );
-    await ctx.runMutation(internal.moderation.punishSupportBreak, {
-      messageId,
-      dmScore,
-      punishment,
-      confidence: answer.type === "choice" ? answer.confidence : undefined,
     });
     return null;
   },
