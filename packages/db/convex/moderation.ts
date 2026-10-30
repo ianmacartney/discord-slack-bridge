@@ -136,6 +136,13 @@ async function handleViolation(
     reason += `; not ${punishment === "ban" ? "banned" : "kicked"} automatically in a VIP channel`;
     punishment = "timeout";
   }
+  const memberForAMonth =
+    !!author.joinedTimestamp &&
+    Date.now() - author.joinedTimestamp > 30 * 86_400_000;
+  if (kind === "raid" && punishment === "ban" && memberForAMonth) {
+    reason += "; member for 30+ days, a mod decides";
+    punishment = "timeout";
+  }
   const harsherOrEqual: NewAction["action"][] =
     punishment === "timeout" ? ["ban", "kick", "timeout"] : ["ban", "kick"];
   for (const action of harsherOrEqual) {
@@ -303,13 +310,16 @@ export const checkRaid = async (
 
   const open = raids.find((r) => r.decision !== "ignored");
   if (open) {
-    const place = await placeOf(ctx, message);
+    const [place, first] = await Promise.all([
+      placeOf(ctx, message),
+      ctx.db.get("messages", open.messageIds[0]),
+    ]);
     await ctx.db.patch("raids", open._id, {
       messageIds: [...open.messageIds, messageId],
       channelIds: [...new Set([...open.channelIds, place.id])],
       spreadSeconds: Math.round(
-        open.spreadSeconds +
-          (message._creationTime - open._creationTime) / 1000,
+        (message._creationTime - (first?._creationTime ?? open._creationTime)) /
+          1000,
       ),
     });
     return true;
@@ -507,14 +517,16 @@ export const applyPolicy = internalMutation({
       const message = await ctx.db.get("messages", messageId);
       const raid =
         message &&
-        (await ctx.db
-          .query("raids")
-          .withIndex("by_authorId", (q) =>
-            q
-              .eq("authorId", message.authorId)
-              .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
-          )
-          .first());
+        (
+          await ctx.db
+            .query("raids")
+            .withIndex("by_authorId", (q) =>
+              q
+                .eq("authorId", message.authorId)
+                .gt("_creationTime", Date.now() - RAID_WINDOW_MS),
+            )
+            .take(5)
+        ).find((r) => r.decision !== "ignored");
       if (raid) {
         if (raid.decision !== "banned") {
           await ctx.db.patch("raids", raid._id, { decision: "banned" });

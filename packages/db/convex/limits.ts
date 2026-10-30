@@ -1,4 +1,4 @@
-import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
+import { MINUTE, RateLimiter, SECOND } from "@convex-dev/rate-limiter";
 import { components } from "./_generated/api";
 
 const limiter = new RateLimiter(components.rateLimiter, {
@@ -9,8 +9,7 @@ const limiter = new RateLimiter(components.rateLimiter, {
     period: 5 * MINUTE,
     capacity: 1,
   },
-  // More than this starts a spam-raid check (it never deletes on its own).
-  messages: { kind: "fixed window", rate: 5, period: MINUTE },
+  raidCheck: { kind: "fixed window", rate: 5, period: 10 * SECOND },
 });
 
 type LimitName = keyof NonNullable<typeof limiter.limits>;;

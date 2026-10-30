@@ -172,7 +172,7 @@ export const receiveMessage = apiMutation({
       (await checkRaid(
         ctx,
         messageId,
-        !(await limitPerPerson(ctx, "messages", author.id)).ok,
+        !(await limitPerPerson(ctx, "raidCheck", author.id)).ok,
       ));
 
     if (threadId && thread && message.id === thread.id) {

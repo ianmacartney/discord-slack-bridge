@@ -25,6 +25,7 @@ export const MESSAGE_CATEGORIES = {
     "Unsolicited promotion, scams, repeated junk, bot-like repetition, self-promotion unrelated to Convex, " +
     "phishing or scam links, or links with no relevance to the conversation. " +
     "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp, " +
+    'casual or joking chatter about trading, crypto or money that exists only to drop a link, such as "my trading skills are so bad hahah https://…", ' +
     'and selling or reselling AI model access or API keys, such as "one key, all models" or "GPT + Claude at 90% off".',
   convex_self_promo:
     "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",

@@ -2,7 +2,7 @@ export const VIOLATION_TIMEOUT_MINUTES = 24 * 60;
 export const MOD_TIMEOUT_MINUTES = 7 * 24 * 60;
 
 export const THRESHOLD_DEFAULTS = {
-  spam: 0.95,
+  spam: 0.85,
   nsfw_or_violent: 0.9,
   job_solicitation: 0.9,
   piracy_or_secrets: 0.9,
