@@ -52,31 +52,40 @@ const BAN_QUESTION = {
     "A real person being rude, off-topic or asking for work is no.",
 } as const;
 
-const DM_QUESTION = {
-  type: "noul",
-  instructions:
-    `Server rule: ${SUPPORT_RULE} ` +
-    "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
-    "saying the author sent them a DM, offering help or asking people to DM, " +
-    '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
-    "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely." +
-    ONLY_THE_MESSAGE,
-} as const;
+const supportCheck = (isModerator: boolean) =>
+  "Is this person trying to assist someone outside of community-support, or outside the known support email for convex.dev? Is this message attaching a link to another discord, or another place to get support from,Is this person a Moderator or an admin? " +
+  isModerator +
+  "If this is scam baiting, ban immdiatly";
 
-const SUPPORT_PUNISHMENT = {
-  type: "choice",
-  instructions:
-    `Server rule: ${SUPPORT_RULE} ` +
-    "`message` breaks that rule. Decide what happens to its author, from `firstMessage` (whether this is the first " +
-    "message they have posted here), `authorHistory` (their messages before this one, oldest first), `joinedServer` " +
-    "and `accountCreated`. Be strict: when torn between two options, choose the harsher one.",
-  criteria: {
-    ban: "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away.",
-    kick: "They have posted before, but nothing that shows a genuine Convex user.",
-    timeout:
-      "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
-  },
-} as const;
+const dmQuestion = (isModerator: boolean) =>
+  ({
+    type: "noul",
+    instructions:
+      `Server rule: ${SUPPORT_RULE} ` +
+      "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
+      "saying the author sent them a DM, offering help or asking people to DM, " +
+      '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
+      "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely. " +
+      supportCheck(isModerator) +
+      ONLY_THE_MESSAGE,
+  }) as const;
+
+const supportPunishment = (isModerator: boolean) =>
+  ({
+    type: "choice",
+    instructions:
+      `Server rule: ${SUPPORT_RULE} ` +
+      "`message` breaks that rule. Decide what happens to its author, from `firstMessage` (whether this is the first " +
+      "message they have posted here), `authorHistory` (their messages before this one, oldest first), `joinedServer` " +
+      "and `accountCreated`. Be strict: when torn between two options, choose the harsher one. " +
+      supportCheck(isModerator),
+    criteria: {
+      ban: "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away.",
+      kick: "They have posted before, but nothing that shows a genuine Convex user.",
+      timeout:
+        "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
+    },
+  }) as const;
 
 // Only asked when the message tags the Convex team.
 const TEAM_PING_QUESTIONS = {
@@ -126,6 +135,7 @@ const messageWithContext = v.object({
   earlierMessages: v.array(earlierMessage),
   replyTo: v.optional(earlierMessage),
   mentionedPeople: v.number(),
+  isModerator: v.boolean(),
 });
 
 export const getMessageForClassification = internalQuery({
@@ -175,6 +185,7 @@ export const getMessageForClassification = internalQuery({
           ? await brief(replied)
           : undefined,
       mentionedPeople: new Set(message.content.match(/<@!?\d+>/g)).size,
+      isModerator: !!message.fromModerator,
     };
   },
 });
@@ -233,6 +244,7 @@ const supportBreak = v.object({
   authorHistory: v.array(v.string()),
   joinedServer: v.union(v.null(), v.string()),
   accountCreated: v.string(),
+  isModerator: v.boolean(),
 });
 
 export const getSupportBreak = internalQuery({
@@ -265,6 +277,7 @@ export const getSupportBreak = internalQuery({
         ? new Date(author.joinedTimestamp).toISOString()
         : null,
       accountCreated: new Date(author.createdTimestamp).toISOString(),
+      isModerator: !!message.fromModerator,
     };
   },
 });
@@ -332,7 +345,9 @@ export const judgeSupportBreak = internalAction({
       { messageId },
     );
     if (!state) return null;
-    const { answers } = await decide(state, { punishment: SUPPORT_PUNISHMENT });
+    const { answers } = await decide(state, {
+      punishment: supportPunishment(state.isModerator),
+    });
     const answer = answers.punishment;
     const punishment =
       answer.type === "choice" &&
@@ -376,6 +391,7 @@ export const classifyMessage = internalAction({
         earlierMessages: message.earlierMessages,
         replyTo: message.replyTo,
         mentionedPeople: message.mentionedPeople,
+        isModerator: message.isModerator,
       },
       {
         category: {
@@ -386,7 +402,7 @@ export const classifyMessage = internalAction({
           criteria: MESSAGE_CATEGORIES,
         },
         ban: BAN_QUESTION,
-        dm: DM_QUESTION,
+        dm: dmQuestion(message.isModerator),
         ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
       },
     );

@@ -177,6 +177,7 @@ export const receiveMessage = apiMutation({
       channelId,
       threadId,
       privateChannel,
+      fromModerator,
     });
 
     const checkable =
