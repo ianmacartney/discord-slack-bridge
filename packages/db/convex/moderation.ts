@@ -115,7 +115,7 @@ async function handleViolation(
   kind: string,
   confidence: number | undefined,
   reason: string,
-  punishment: "timeout" | "kick" | "ban" = "timeout",
+  punishment: "timeout" | "ban" = "timeout",
 ) {
   const message = await ctx.db.get("messages", messageId);
   if (!message) return;
@@ -133,7 +133,7 @@ async function handleViolation(
       s.vipChannelIds?.some((id) => id === channel.id || id === thread?.id),
     )
   ) {
-    reason += `; not ${punishment === "ban" ? "banned" : "kicked"} automatically in a VIP channel`;
+    reason += "; not banned automatically in a VIP channel";
     punishment = "timeout";
   }
   const memberForAMonth =
@@ -148,22 +148,16 @@ async function handleViolation(
   for (const action of harsherOrEqual) {
     if (await countRecent(ctx, author.id, action, RAID_WINDOW_MS)) return;
   }
-  if (punishment !== "timeout") {
-    const base = {
+  if (punishment === "ban") {
+    await record(ctx, {
       auto: true,
       category: kind,
       confidence,
       targetDiscordUserId: author.id,
       channelId,
       discordMessageId: message.id,
-    };
-    if (punishment === "kick") {
-      await record(ctx, { ...base, action: "delete", reason });
-    }
-    await record(ctx, {
-      ...base,
-      action: punishment,
-      ...(punishment === "ban" && { deleteMessageDays: BAN_DELETE_DAYS }),
+      action: "ban",
+      deleteMessageDays: BAN_DELETE_DAYS,
       reason,
     });
     return;
@@ -276,7 +270,7 @@ const hasRecentViolation = async (
 };
 
 /**
- * Runs on every message a person sends. Spots a spam raid (the same post in several channels, or going over the
+ * Runs on every message a non-moderator sends. Spots a spam raid (the same post in several channels, or going over the
  * message rate limit) and acts once per raid. Returns true when the message belongs to a raid, so it skips per-message
  * classification and punishment.
  */
@@ -451,29 +445,6 @@ export const settleRaid = internalMutation({
   },
 });
 
-export const punishSupportBreak = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    dmScore: v.number(),
-    punishment: literals("timeout", "kick", "ban"),
-    confidence: v.optional(v.number()),
-  },
-  returns: v.null(),
-  handler: async (ctx, { messageId, dmScore, punishment, confidence }) => {
-    const pct = (n = 0) => `${Math.round(n * 100)}%`;
-    await handleViolation(
-      ctx,
-      messageId,
-      "dm_solicitation",
-      dmScore,
-      `Sent people to support outside the Convex dashboard or community-support (Jev, ${pct(dmScore)}); ` +
-        `Jev chose ${punishment} (${pct(confidence)})`,
-      punishment,
-    );
-    return null;
-  },
-});
-
 export const applyPolicy = internalMutation({
   args: {
     messageId: v.id("messages"),
@@ -590,7 +561,10 @@ export const applyPolicy = internalMutation({
         );
         return null;
       }
-      const ban = category === "spam" || banScore >= min.ban;
+      const ban =
+        category === "spam" ||
+        banScore >= min.ban ||
+        dmScore >= min.dm_solicitation;
       await handleViolation(
         ctx,
         messageId,
@@ -607,10 +581,14 @@ export const applyPolicy = internalMutation({
       return null;
     }
     if (dmScore >= min.dm_solicitation) {
-      await ctx.scheduler.runAfter(0, internal.classify.judgeSupportBreak, {
+      await handleViolation(
+        ctx,
         messageId,
+        "dm_solicitation",
         dmScore,
-      });
+        `Sent people to support outside the Convex dashboard or community-support (Jev, ${Math.round(dmScore * 100)}%)`,
+        "ban",
+      );
       return null;
     }
     if (

@@ -135,8 +135,21 @@ export const receiveMessage = apiMutation({
     channel: v.object(DiscordChannel),
     thread: v.optional(v.object(DiscordThread)),
     pingedTeam: v.optional(v.boolean()),
+    privateChannel: v.optional(v.boolean()),
+    fromModerator: v.optional(v.boolean()),
   },
-  handler: async (ctx, { author, message, channel, thread, pingedTeam }) => {
+  handler: async (
+    ctx,
+    {
+      author,
+      message,
+      channel,
+      thread,
+      pingedTeam,
+      privateChannel,
+      fromModerator,
+    },
+  ) => {
     if (!message.content && !message.attachments?.length) {
       return;
     }
@@ -163,38 +176,33 @@ export const receiveMessage = apiMutation({
       authorId,
       channelId,
       threadId,
+      privateChannel,
+      fromModerator,
     });
 
     const fromPerson =
       !author.bot && (message.type === 0 || message.type === 19);
+    const checkable = fromPerson && !fromModerator;
     const partOfRaid =
-      fromPerson &&
+      checkable &&
       (await checkRaid(
         ctx,
         messageId,
         !(await limitPerPerson(ctx, "raidCheck", author.id)).ok,
       ));
 
-    if (threadId && thread && message.id === thread.id) {
+    if (threadId && thread && message.id === thread.id && !privateChannel) {
       await ctx.scheduler.runAfter(0, internal.tags.tagNewPost, { threadId });
     }
 
-    if (
-      !author.bot &&
-      (message.type === 0 || message.type === 19) &&
-      /(^|\W)@(everyone|here)\b/.test(message.content)
-    ) {
+    if (checkable && /(^|\W)@(everyone|here)\b/.test(message.content)) {
       await ctx.scheduler.runAfter(0, internal.moderation.alertMassMention, {
         messageId,
       });
     }
 
     const codes = inviteCodes(message.content);
-    if (
-      !author.bot &&
-      (message.type === 0 || message.type === 19) &&
-      codes.length
-    ) {
+    if (checkable && codes.length) {
       await ctx.scheduler.runAfter(0, internal.moderation_node.checkInvites, {
         messageId,
         channelId: thread?.id ?? channel.id,
@@ -202,7 +210,16 @@ export const receiveMessage = apiMutation({
       });
     }
 
-    if (fromPerson && !partOfRaid) {
+    // Classifying is how a message gets forwarded, so a private channel still counts if it's the /forwardfrom channel.
+    if (
+      fromPerson &&
+      !partOfRaid &&
+      (!privateChannel ||
+        (!thread &&
+          (await ctx.db.query("guildSettings").take(50)).some(
+            (s) => s.forwardFromChannelId === channel.id,
+          )))
+    ) {
       await ctx.scheduler.runAfter(0, internal.classify.classifyMessage, {
         messageId,
         pingedTeam,

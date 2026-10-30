@@ -13,7 +13,6 @@ const MAX_MESSAGE_CHARS = 4000;
 // 20 x 1000 + 4000 stays under the ~32KB where Jev switches to its slower long-context mode.
 const EARLIER_MESSAGES = 20;
 const MAX_EARLIER_CHARS = 1000;
-const AUTHOR_HISTORY = 5;
 const ONLY_THE_MESSAGE =
   " Judge `message` only; `earlierMessages` and `replyTo` are the conversation before it.";
 
@@ -26,6 +25,7 @@ export const MESSAGE_CATEGORIES = {
     "phishing or scam links, or links with no relevance to the conversation. " +
     "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp, " +
     'casual or joking chatter about trading, crypto or money that exists only to drop a link, such as "my trading skills are so bad hahah https://…", ' +
+    "posts about an unrelated company or product that link to the author's own post or article and ask the community for opinions, " +
     'and selling or reselling AI model access or API keys, such as "one key, all models" or "GPT + Claude at 90% off".',
   convex_self_promo:
     "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",
@@ -52,31 +52,25 @@ const BAN_QUESTION = {
     "A real person being rude, off-topic or asking for work is no.",
 } as const;
 
-const DM_QUESTION = {
-  type: "noul",
-  instructions:
-    `Server rule: ${SUPPORT_RULE} ` +
-    "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
-    "saying the author sent them a DM, offering help or asking people to DM, " +
-    '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
-    "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely." +
-    ONLY_THE_MESSAGE,
-} as const;
+const supportCheck = (isModerator: boolean) =>
+  "Is this person trying to assist someone outside of community-support, or outside the known support email for convex.dev? Is this message attaching a link to another discord, or another place to get support from,Is this person a Moderator or an admin? " +
+  isModerator +
+  "If this is scam baiting, ban immdiatly";
 
-const SUPPORT_PUNISHMENT = {
-  type: "choice",
-  instructions:
-    `Server rule: ${SUPPORT_RULE} ` +
-    "`message` breaks that rule. Decide what happens to its author, from `firstMessage` (whether this is the first " +
-    "message they have posted here), `authorHistory` (their messages before this one, oldest first), `joinedServer` " +
-    "and `accountCreated`. Be strict: when torn between two options, choose the harsher one.",
-  criteria: {
-    ban: "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away.",
-    kick: "They have posted before, but nothing that shows a genuine Convex user.",
-    timeout:
-      "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
-  },
-} as const;
+const dmQuestion = (isModerator: boolean) =>
+  ({
+    type: "noul",
+    instructions:
+      `Server rule: ${SUPPORT_RULE} ` +
+      "Does this message break that rule or look like a support scam? Yes includes telling someone to check their DMs, " +
+      "saying the author sent them a DM, offering help or asking people to DM, " +
+      '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
+      "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely. " +
+      'Telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, such as a social media post or ticket page, is yes, even with nothing else in the message. ' +
+      'Mentioning a DM for something other than getting help or support is no, such as a meetup, or a friendly invite to chat ("happy to chat about how we use Convex, feel free to DM me"). Only a DM that offers to help, fix or support someone is yes. ' +
+      supportCheck(isModerator) +
+      ONLY_THE_MESSAGE,
+  }) as const;
 
 // Only asked when the message tags the Convex team.
 const TEAM_PING_QUESTIONS = {
@@ -126,6 +120,7 @@ const messageWithContext = v.object({
   earlierMessages: v.array(earlierMessage),
   replyTo: v.optional(earlierMessage),
   mentionedPeople: v.number(),
+  isModerator: v.boolean(),
 });
 
 export const getMessageForClassification = internalQuery({
@@ -170,8 +165,12 @@ export const getMessageForClassification = internalQuery({
       earlierMessages: await Promise.all(
         earlier.filter(kept).reverse().map(brief),
       ),
-      replyTo: kept(replied) ? await brief(replied) : undefined,
+      replyTo:
+        kept(replied) && (message.privateChannel || !replied.privateChannel)
+          ? await brief(replied)
+          : undefined,
       mentionedPeople: new Set(message.content.match(/<@!?\d+>/g)).size,
+      isModerator: !!message.fromModerator,
     };
   },
 });
@@ -220,47 +219,6 @@ export const getMessageByDiscordId = internalQuery({
     return {
       text: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
       author: author?.displayName ?? author?.username ?? "unknown",
-    };
-  },
-});
-
-const supportBreak = v.object({
-  message: v.string(),
-  firstMessage: v.boolean(),
-  authorHistory: v.array(v.string()),
-  joinedServer: v.union(v.null(), v.string()),
-  accountCreated: v.string(),
-});
-
-export const getSupportBreak = internalQuery({
-  args: { messageId: v.id("messages") },
-  returns: v.union(v.null(), supportBreak),
-  handler: async ({ db }, { messageId }) => {
-    const message = await db.get("messages", messageId);
-    if (!message) return null;
-    const [author, earlier] = await Promise.all([
-      db.get("users", message.authorId),
-      db
-        .query("messages")
-        .withIndex("by_authorId", (q) =>
-          q
-            .eq("authorId", message.authorId)
-            .lt("_creationTime", message._creationTime),
-        )
-        .order("desc")
-        .take(AUTHOR_HISTORY),
-    ]);
-    if (!author) return null;
-    return {
-      message: message.cleanContent.slice(0, MAX_MESSAGE_CHARS),
-      firstMessage: earlier.length === 0,
-      authorHistory: earlier
-        .reverse()
-        .map((m) => m.cleanContent.slice(0, MAX_EARLIER_CHARS)),
-      joinedServer: author.joinedTimestamp
-        ? new Date(author.joinedTimestamp).toISOString()
-        : null,
-      accountCreated: new Date(author.createdTimestamp).toISOString(),
     };
   },
 });
@@ -318,36 +276,6 @@ export const judgeRaid = internalAction({
   },
 });
 
-/** Someone broke the support rule: Jev picks ban, kick or a one-day timeout from their history. */
-export const judgeSupportBreak = internalAction({
-  args: { messageId: v.id("messages"), dmScore: v.number() },
-  returns: v.null(),
-  handler: async (ctx, { messageId, dmScore }): Promise<null> => {
-    const state: Infer<typeof supportBreak> | null = await ctx.runQuery(
-      internal.classify.getSupportBreak,
-      { messageId },
-    );
-    if (!state) return null;
-    const { answers } = await decide(state, { punishment: SUPPORT_PUNISHMENT });
-    const answer = answers.punishment;
-    const punishment =
-      answer.type === "choice" &&
-      (answer.choice === "ban" || answer.choice === "kick")
-        ? answer.choice
-        : "timeout";
-    console.log(
-      `support rule broken (first message ${state.firstMessage}, ${state.authorHistory.length} earlier): ${punishment} (confidence ${answer.type === "choice" ? answer.confidence : "n/a"})`,
-    );
-    await ctx.runMutation(internal.moderation.punishSupportBreak, {
-      messageId,
-      dmScore,
-      punishment,
-      confidence: answer.type === "choice" ? answer.confidence : undefined,
-    });
-    return null;
-  },
-});
-
 export const classifyMessage = internalAction({
   args: { messageId: v.id("messages"), pingedTeam: v.optional(v.boolean()) },
   returns: v.union(v.null(), messageClassification),
@@ -364,28 +292,43 @@ export const classifyMessage = internalAction({
 
     if (!message) return null;
 
-    const { answers } = await decide(
-      {
-        message: message.text,
-        author: message.author,
-        thread: message.threadName,
-        earlierMessages: message.earlierMessages,
-        replyTo: message.replyTo,
-        mentionedPeople: message.mentionedPeople,
+    const state = {
+      message: message.text,
+      author: message.author,
+      thread: message.threadName,
+      earlierMessages: message.earlierMessages,
+      replyTo: message.replyTo,
+      mentionedPeople: message.mentionedPeople,
+      isModerator: message.isModerator,
+    };
+
+    // Moderators only get the support check, so nothing else Jev could say applies to them.
+    if (message.isModerator) {
+      const { answers } = await decide(state, { dm: dmQuestion(true) });
+      const dmScore = answers.dm.type === "noul" ? answers.dm.noul : 0;
+      console.log(
+        `support check on moderator ${message.author}: "${message.text.slice(0, 60)}" (dm ${dmScore})`,
+      );
+      await ctx.runMutation(internal.moderation.applyPolicy, {
+        messageId,
+        category: "normal",
+        dmScore,
+      });
+      return null;
+    }
+
+    const { answers } = await decide(state, {
+      category: {
+        type: "choice",
+        instructions:
+          "Which category best describes this Discord message?" +
+          ONLY_THE_MESSAGE,
+        criteria: MESSAGE_CATEGORIES,
       },
-      {
-        category: {
-          type: "choice",
-          instructions:
-            "Which category best describes this Discord message?" +
-            ONLY_THE_MESSAGE,
-          criteria: MESSAGE_CATEGORIES,
-        },
-        ban: BAN_QUESTION,
-        dm: DM_QUESTION,
-        ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
-      },
-    );
+      ban: BAN_QUESTION,
+      dm: dmQuestion(message.isModerator),
+      ...(pingedTeam ? TEAM_PING_QUESTIONS : {}),
+    });
 
     const answer = answers.category;
     if (answer.type !== "choice")
