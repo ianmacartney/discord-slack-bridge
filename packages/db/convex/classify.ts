@@ -26,6 +26,7 @@ export const MESSAGE_CATEGORIES = {
     "phishing or scam links, or links with no relevance to the conversation. " +
     "Includes get-rich-quick, trading or profit-share offers that push people to DMs, Telegram or WhatsApp, " +
     'casual or joking chatter about trading, crypto or money that exists only to drop a link, such as "my trading skills are so bad hahah https://…", ' +
+    "posts about an unrelated company or product that link to the author's own post or article and ask the community for opinions, " +
     'and selling or reselling AI model access or API keys, such as "one key, all models" or "GPT + Claude at 90% off".',
   convex_self_promo:
     "Sharing something the author made with or about Convex, such as a project, template, component, post or video.",
@@ -66,6 +67,7 @@ const dmQuestion = (isModerator: boolean) =>
       "saying the author sent them a DM, offering help or asking people to DM, " +
       '"submit a ticket here" or similar pointing anywhere other than the Convex dashboard or community-support, ' +
       "and links to another server or site for support. Tagging many people (see `mentionedPeople`) makes it more likely. " +
+      'Telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, such as a social media post or ticket page, is yes, even with nothing else in the message. ' +
       supportCheck(isModerator) +
       ONLY_THE_MESSAGE,
   }) as const;
@@ -80,7 +82,9 @@ const supportPunishment = (isModerator: boolean) =>
       "and `accountCreated`. Be strict: when torn between two options, choose the harsher one. " +
       supportCheck(isModerator),
     criteria: {
-      ban: "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away.",
+      ban:
+        "Their first message, or a history with nothing about Convex and nothing of value. Ban them right away. " +
+        'Also ban for telling someone to "ask below" at a link, or to ask or contact an "official" administrator, agent or support person at a link, whatever their history.',
       kick: "They have posted before, but nothing that shows a genuine Convex user.",
       timeout:
         "A genuine member who has asked about or discussed Convex before. Time them out for one day.",
