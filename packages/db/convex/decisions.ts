@@ -45,4 +45,6 @@ export const decide = <Q extends Record<string, JevQuestion>>(
     model: JEV_MODEL,
     state,
     questions,
+    // Zero data retention: providers must not store or train on our requests.
+    provider: { zdr: true, data_collection: "deny" },
   });

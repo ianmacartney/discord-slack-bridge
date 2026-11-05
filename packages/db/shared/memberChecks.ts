@@ -2,11 +2,13 @@ import {
   type APIGuild,
   type APIGuildMember,
   type APIRole,
+  ChannelType,
+  type GuildTextBasedChannel,
   PermissionFlagsBits as P,
   PermissionsBitField,
 } from "discord.js";
 
-const MODERATOR_PERMISSIONS = [
+export const MODERATOR_PERMISSIONS = [
   P.Administrator,
   P.ManageGuild,
   P.KickMembers,
@@ -22,6 +24,11 @@ export const isModerator = (guild: APIGuild, member: APIGuildMember) =>
   new PermissionsBitField(
     rolesOf(guild, member).map((r) => BigInt(r.permissions)),
   ).any(MODERATOR_PERMISSIONS);
+
+// A thread's permissions come from its parent, so a private thread needs its own check.
+export const isPublicChannel = (channel: GuildTextBasedChannel) =>
+  channel.type !== ChannelType.PrivateThread &&
+  !!channel.permissionsFor(channel.guild.roles.everyone)?.has(P.ViewChannel);
 
 // Discord ranks roles by position, and the older role (smaller id) wins a tie.
 const outranks = (a: APIRole, b: APIRole) =>
