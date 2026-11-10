@@ -38,6 +38,10 @@ import {
   registerTagsCommand,
 } from "./tagCommand.js";
 import {
+  isPublicChannel,
+  MODERATOR_PERMISSIONS,
+} from "./shared/memberChecks.js";
+import {
   serializeAuthor,
   serializeChannel,
   serializeMessage,
@@ -134,6 +138,8 @@ bot.on("messageCreate", async (msg) => {
         !!msg.mentions.members?.some((m) =>
           m.roles.cache.some((r) => isTeamRole(r.name)),
         )),
+    privateChannel: !msg.inGuild() || !isPublicChannel(msg.channel),
+    fromModerator: !!msg.member?.permissions.any(MODERATOR_PERMISSIONS),
     apiToken,
   };
   console.log(

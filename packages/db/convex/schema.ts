@@ -70,6 +70,8 @@ export const Messages = Table("messages", {
   deleted: v.optional(v.boolean()),
   threadId: v.optional(v.id("threads")),
   slackTs: v.optional(v.string()),
+  privateChannel: v.optional(v.boolean()),
+  fromModerator: v.optional(v.boolean()),
   ...DiscordMessage,
 });
 
